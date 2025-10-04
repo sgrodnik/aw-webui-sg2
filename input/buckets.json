@@ -1,0 +1,42 @@
+{
+  "aw-watcher-afk_folio1040": {
+    "id": "aw-watcher-afk_folio1040",
+    "created": "2025-06-15T20:25:50.320425+00:00",
+    "name": null,
+    "type": "afkstatus",
+    "client": "aw-watcher-afk",
+    "hostname": "folio1040",
+    "data": {},
+    "last_updated": "2025-10-04T06:14:22.677000+00:00"
+  },
+  "aw-watcher-window_folio1040": {
+    "id": "aw-watcher-window_folio1040",
+    "created": "2025-06-15T20:25:50.669524+00:00",
+    "name": null,
+    "type": "currentwindow",
+    "client": "aw-watcher-window",
+    "hostname": "folio1040",
+    "data": {},
+    "last_updated": "2025-10-04T06:14:30.753000+00:00"
+  },
+  "aw-stopwatch": {
+    "id": "aw-stopwatch",
+    "created": "2025-06-30T12:59:35.024848+00:00",
+    "name": null,
+    "type": "general.stopwatch",
+    "client": "aw-webui",
+    "hostname": "unknown",
+    "data": {},
+    "last_updated": "2025-09-27T06:26:47+00:00"
+  },
+  "aw-watcher-vscode_folio1040": {
+    "id": "aw-watcher-vscode_folio1040",
+    "created": "2025-07-26T10:00:10.338396+00:00",
+    "name": null,
+    "type": "app.editor.activity",
+    "client": "aw-watcher-vscode",
+    "hostname": "folio1040",
+    "data": {},
+    "last_updated": "2025-10-04T06:13:11.285000+00:00"
+  }
+}

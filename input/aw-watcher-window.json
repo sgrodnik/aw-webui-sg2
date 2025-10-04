@@ -1,0 +1,47 @@
+[
+  {
+    "id": 33265,
+    "timestamp": "2025-10-04T06:13:49.725000+00:00",
+    "duration": 82.619,
+    "data": {
+      "app": "chrome.exe",
+      "title": "API - Google Chrome"
+    }
+  },
+  {
+    "id": 33264,
+    "timestamp": "2025-10-04T06:13:48.684000+00:00",
+    "duration": 0,
+    "data": {
+      "app": "chrome.exe",
+      "title": "localhost:5600/api/ - Google Chrome"
+    }
+  },
+  {
+    "id": 33263,
+    "timestamp": "2025-10-04T06:13:47.668000+00:00",
+    "duration": 0,
+    "data": {
+      "app": "chrome.exe",
+      "title": "Без имени - Google Chrome"
+    }
+  },
+  {
+    "id": 33262,
+    "timestamp": "2025-10-04T06:13:46.649000+00:00",
+    "duration": 0,
+    "data": {
+      "app": "explorer.exe",
+      "title": ""
+    }
+  },
+  {
+    "id": 33261,
+    "timestamp": "2025-10-04T06:13:45.625000+00:00",
+    "duration": 0,
+    "data": {
+      "app": "aw-qt.exe",
+      "title": "aw-qt"
+    }
+  }
+]
