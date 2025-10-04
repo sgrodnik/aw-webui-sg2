@@ -1,9 +1,71 @@
 <script>
   import { onMount } from 'svelte';
+  import { getEvents } from './lib/apiClient.js';
+  import { processActivityData } from './lib/dataProcessor.js';
 
   let buckets = null;
   let corsError = false;
   let origin = '';
+
+  /**
+   * Finds a bucket ID from the buckets object based on the client name.
+   * @param {object} allBuckets The object containing all bucket metadata.
+   * @param {string} clientName The client name to search for (e.g., 'aw-watcher-afk').
+   * @returns {string|null} The found bucket ID, or null.
+   */
+  function findBucketId(allBuckets, clientName) {
+    if (!allBuckets) return null;
+    const bucket = Object.values(allBuckets).find(b => b.client === clientName);
+    return bucket ? bucket.id : null;
+  }
+
+  /**
+   * Main data fetching and processing pipeline.
+   */
+  async function loadAndProcessEvents() {
+    console.log("Starting data processing pipeline...");
+
+    // Dynamically find bucket IDs from the fetched list
+    const BUCKET_AFK_ID = findBucketId(buckets, 'aw-watcher-afk');
+    const BUCKET_WINDOW_ID = findBucketId(buckets, 'aw-watcher-window');
+    // The stopwatch bucket is special, its client is often 'aw-webui' but its ID is just 'aw-stopwatch'
+    const BUCKET_STOPWATCH_ID = buckets['aw-stopwatch'] ? 'aw-stopwatch' : findBucketId(buckets, 'aw-stopwatch');
+
+    if (!BUCKET_AFK_ID || !BUCKET_WINDOW_ID || !BUCKET_STOPWATCH_ID) {
+        console.error("Could not find all required buckets. Aborting processing.", {
+            afk: BUCKET_AFK_ID,
+            window: BUCKET_WINDOW_ID,
+            stopwatch: BUCKET_STOPWATCH_ID
+        });
+        return; // Stop execution if buckets aren't found
+    }
+
+    console.log("Successfully found bucket IDs:", { afk: BUCKET_AFK_ID, window: BUCKET_WINDOW_ID, stopwatch: BUCKET_STOPWATCH_ID });
+
+    // Define a time range for the query.
+    const startTime = new Date('2025-10-03T00:00:00Z').toISOString();
+    const endTime   = new Date('2025-10-03T23:59:59Z').toISOString();
+
+    console.log(`Fetching events from ${startTime} to ${endTime}`);
+
+    try {
+      // Fetch all event types in parallel for efficiency.
+      const [afkEvents, windowEvents, stopwatchEvents] = await Promise.all([
+        getEvents(BUCKET_AFK_ID, startTime, endTime),
+        getEvents(BUCKET_WINDOW_ID, startTime, endTime),
+        getEvents(BUCKET_STOPWATCH_ID, startTime, endTime)
+      ]);
+
+      // Pass the raw data to the processor.
+      const processedData = processActivityData(afkEvents, windowEvents, stopwatchEvents);
+
+      console.log("--- PIPELINE FINISHED ---");
+      console.log("Final processed data:", processedData);
+
+    } catch (error) {
+      console.error("An error occurred during the data processing pipeline:", error);
+    }
+  }
 
   onMount(async () => {
     if (typeof window !== 'undefined') {
@@ -16,7 +78,11 @@
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       buckets = await response.json();
-      console.log('Success! Data received:', buckets);
+      console.log('Success! Bucket list received:', buckets);
+
+      // After successfully getting the bucket list, start the main processing pipeline.
+      await loadAndProcessEvents();
+
     } catch (error) {
       console.error('Error fetching data:', error);
       corsError = true;
