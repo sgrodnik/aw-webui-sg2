@@ -11,7 +11,7 @@ const BASE_URL = "http://localhost:5600/api";
  * @returns {Promise<Array>} A promise that resolves to an array of events.
  */
 export async function getEvents(bucketId, startTime, endTime) {
-    const url = `${BASE_URL}/0/buckets/${bucketId}/events?starttime=${startTime}&endtime=${endTime}`;
+    const url = `${BASE_URL}/0/buckets/${bucketId}/events?start=${startTime}&end=${endTime}`;
     
     try {
         const response = await fetch(url);

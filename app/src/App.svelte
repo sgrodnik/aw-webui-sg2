@@ -57,7 +57,7 @@
       ]);
 
       // Pass the raw data to the processor.
-      const processedData = processActivityData(afkEvents, windowEvents, stopwatchEvents);
+      const processedData = await processActivityData(afkEvents, windowEvents, stopwatchEvents);
 
       console.log("--- PIPELINE FINISHED ---");
       console.log("Final processed data:", processedData);
