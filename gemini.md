@@ -16,7 +16,7 @@ The application is a single-page application (SPA) that runs entirely in the bro
 *   `input/swagger.json`: The OpenAPI (Swagger) 2.0 specification for the ActivityWatch REST API. This is the most important file in the project, as it describes all the available API endpoints, their parameters, and their responses.
 *   `app/src/App.svelte`: The main Svelte component that serves as the entry point for the user interface. It orchestrates data fetching and processing.
 *   `app/src/lib/apiClient.js`: A module responsible for all communication with the ActivityWatch REST API. It handles fetching events from the server.
-*   `app/src/lib/dataProcessor.js`: Manages the Web Worker, providing a simple interface for the main application to offload data processing.
+*   `app/src/lib/dataProcessor.js`: The core of the application's logic. This module is responsible for processing the raw data from ActivityWatch (filtering, splitting, aggregating) and ensuring data integrity by cleaning and analyzing events for inconsistencies. Its rules are defined in `input/anchor-context.md`.
 *   `app/src/lib/dataProcessor.worker.js`: Contains the core data processing logic that runs in a background Web Worker to prevent UI freezes.
 *   `app/src/main.js`: The entry point for the frontend application, responsible for initializing the Svelte app.
 *   `app/package.json`: Lists the project's dependencies and defines scripts for building, developing, and testing.

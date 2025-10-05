@@ -48,6 +48,100 @@ function mergeOverlappingIntervals(intervals) {
     return merged;
 }
 
+/**
+ * Analyzes window events for overlaps and logs them.
+ * This is for analysis only and does not modify the events.
+ * @param {Array<object>} windowEvents Array of window event objects.
+ */
+function analyzeWindowOverlaps(windowEvents) {
+    // Sort events by timestamp to easily compare adjacent events
+    const sortedEvents = [...windowEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    console.log('--- Starting Window Overlap Analysis ---');
+    let overlapCount = 0;
+
+    for (let i = 0; i < sortedEvents.length - 1; i++) {
+        const event1 = sortedEvents[i];
+        const event2 = sortedEvents[i+1];
+
+        const end1 = new Date(event1.timestamp).getTime() + event1.duration * 1000;
+        const start2 = new Date(event2.timestamp).getTime();
+
+        if (end1 > start2) {
+            const overlapDuration = (end1 - start2) / 1000;
+            console.log(
+                `[Overlap Detected] Duration: ${overlapDuration.toFixed(3)}s`,
+                {
+                    event1: { id: event1.id, start: event1.timestamp, duration: event1.duration, data: event1.data },
+                    event2: { id: event2.id, start: event2.timestamp, duration: event2.duration, data: event2.data },
+                }
+            );
+            overlapCount++;
+        }
+    }
+
+    if (overlapCount === 0) {
+        console.log('No window overlaps found.');
+    }
+    console.log('--- Finished Window Overlap Analysis ---');
+}
+
+/**
+ * Analyzes task events for overlaps and logs them.
+ * @param {Array<object>} taskEvents Array of stopwatch event objects.
+ */
+function analyzeTaskOverlaps(taskEvents) {
+    const sortedEvents = [...taskEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    console.log('--- Starting Task Overlap Analysis ---');
+    let overlapFound = false;
+
+    for (let i = 0; i < sortedEvents.length; i++) {
+        const event1 = sortedEvents[i];
+        const start1 = new Date(event1.timestamp).getTime();
+        const end1 = start1 + event1.duration * 1000;
+
+        let simultaneousEvents = [event1];
+
+        // Check against subsequent events
+        for (let j = i + 1; j < sortedEvents.length; j++) {
+            const event2 = sortedEvents[j];
+            const start2 = new Date(event2.timestamp).getTime();
+            const end2 = start2 + event2.duration * 1000;
+
+            // Stop checking if event2 is already past event1
+            if (start2 >= end1) {
+                break;
+            }
+
+            overlapFound = true;
+            const overlapStart = Math.max(start1, start2);
+            const overlapEnd = Math.min(end1, end2);
+            const overlapDuration = (overlapEnd - overlapStart) / 1000;
+
+            // Determine overlap type
+            if (start1 <= start2 && end1 >= end2) {
+                console.log(`[Task Overlap - Inclusion] Duration: ${overlapDuration.toFixed(3)}s. Event 2 is inside Event 1.`, { event1, event2 });
+            } else if (start2 <= start1 && end2 >= end1) {
+                console.log(`[Task Overlap - Inclusion] Duration: ${overlapDuration.toFixed(3)}s. Event 1 is inside Event 2.`, { event1, event2 });
+            } else {
+                console.log(`[Task Overlap - Simple] Duration: ${overlapDuration.toFixed(3)}s.`, { event1, event2 });
+            }
+
+            simultaneousEvents.push(event2);
+        }
+
+        if (simultaneousEvents.length > 2) {
+            console.error(`[CRITICAL] ${simultaneousEvents.length} tasks overlap at the same time!`, simultaneousEvents);
+        }
+    }
+
+    if (!overlapFound) {
+        console.log('No task overlaps found.');
+    }
+    console.log('--- Finished Task Overlap Analysis ---');
+}
+
 
 /**
  * Helper to set a value in a nested object path, creating objects if they don't exist.
@@ -155,6 +249,10 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents) {
     // 2. Filter and split events by the cleaned "not-afk" intervals
     const activeWindowEvents = windowEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
     const activeStopwatchEvents = stopwatchEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
+
+    // --- Run analysis on window and task events ---
+    analyzeWindowOverlaps(activeWindowEvents);
+    analyzeTaskOverlaps(activeStopwatchEvents);
 
     // 3. Split active events by hour
     const hourlySplitWindowEvents = activeWindowEvents.flatMap(splitEventByHour);
