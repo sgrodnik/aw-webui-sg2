@@ -2,10 +2,13 @@
   import { onMount } from 'svelte';
   import { getEvents } from './lib/apiClient.js';
   import { processActivityData } from './lib/dataProcessor.js';
+  import TimelineView from './lib/TimelineView.svelte';
 
   let buckets = null;
   let corsError = false;
   let origin = '';
+  let processedData = null;
+  let isLoading = true;
 
   /**
    * Finds a bucket ID from the buckets object based on the client name.
@@ -24,6 +27,7 @@
    */
   async function loadAndProcessEvents() {
     console.log("Starting data processing pipeline...");
+    isLoading = true;
 
     // Dynamically find bucket IDs from the fetched list
     const BUCKET_AFK_ID = findBucketId(buckets, 'aw-watcher-afk');
@@ -37,6 +41,7 @@
             window: BUCKET_WINDOW_ID,
             stopwatch: BUCKET_STOPWATCH_ID
         });
+        isLoading = false;
         return; // Stop execution if buckets aren't found
     }
 
@@ -56,14 +61,16 @@
         getEvents(BUCKET_STOPWATCH_ID, startTime, endTime)
       ]);
 
-      // Pass the raw data to the processor.
-      const processedData = await processActivityData(afkEvents, windowEvents, stopwatchEvents);
+      // Pass the raw data to the processor and store it in the state.
+      processedData = await processActivityData(afkEvents, windowEvents, stopwatchEvents);
 
       console.log("--- PIPELINE FINISHED ---");
       console.log("Final processed data:", processedData);
 
     } catch (error) {
       console.error("An error occurred during the data processing pipeline:", error);
+    } finally {
+      isLoading = false;
     }
   }
 
@@ -86,6 +93,7 @@
     } catch (error) {
       console.error('Error fetching data:', error);
       corsError = true;
+      isLoading = false;
     }
   });
 </script>
@@ -124,15 +132,12 @@ cors_origins = "http://localhost:8000,{origin}"
         После сохранения файла перезапустите сервер ActivityWatch и обновите эту страницу.
       </p>
     </div>
-  {:else if buckets}
-    <h2>Buckets Loaded:</h2>
-    <ul>
-      {#each Object.keys(buckets) as bucketId}
-        <li>{bucketId}</li>
-      {/each}
-    </ul>
+  {:else if isLoading}
+    <p>Загрузка и обработка данных...</p>
+  {:else if processedData}
+    <TimelineView data={processedData} />
   {:else}
-    <p>Загрузка данных с сервера ActivityWatch...</p>
+    <p>Нет данных для отображения.</p>
   {/if}
 </main>
 

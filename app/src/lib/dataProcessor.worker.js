@@ -12,6 +12,44 @@ function getWeekNumber(d) {
 }
 
 /**
+ * Merges overlapping time intervals with detailed logging.
+ * @param {Array<object>} intervals Array of {start, end} Date objects.
+ * @returns {Array<object>} A new array with overlapping intervals merged.
+ */
+function mergeOverlappingIntervals(intervals) {
+    if (intervals.length <= 1) {
+        return intervals;
+    }
+
+    // 1. Sort intervals by start time
+    const sortedIntervals = intervals.sort((a, b) => a.start - b.start);
+
+    const merged = [sortedIntervals[0]];
+
+    for (let i = 1; i < sortedIntervals.length; i++) {
+        const current = sortedIntervals[i];
+        const lastMerged = merged[merged.length - 1];
+
+        // If current interval overlaps with the last merged one, extend the last one
+        if (current.start < lastMerged.end) {
+            console.log('Merging interval:', {
+                start: current.start.toISOString(),
+                end: current.end.toISOString()
+            }, 'into:', {
+                start: lastMerged.start.toISOString(),
+                end: lastMerged.end.toISOString()
+            });
+            lastMerged.end = new Date(Math.max(lastMerged.end, current.end));
+        } else {
+            merged.push(current);
+        }
+    }
+
+    return merged;
+}
+
+
+/**
  * Helper to set a value in a nested object path, creating objects if they don't exist.
  * The final property is always an array to which the value is pushed.
  * @param {object} obj The object to modify.
@@ -102,16 +140,19 @@ function splitEventByHour(event) {
  * @returns {{time_view: object, task_view: object}} The processed data structured for visualization.
  */
 function processActivityData(afkEvents, windowEvents, stopwatchEvents) {
-    // 1. Generate "not-afk" intervals
-    const notAfkIntervals = afkEvents
+    // 1. Generate and clean "not-afk" intervals
+    const rawNotAfkIntervals = afkEvents
         .filter(e => e.data.status === 'not-afk')
         .map(e => {
             const start = new Date(e.timestamp);
             const end = new Date(start.getTime() + e.duration * 1000);
             return { start, end };
         });
+    
+    const notAfkIntervals = mergeOverlappingIntervals(rawNotAfkIntervals);
+    console.log(`Cleaned up not-afk intervals. Before: ${rawNotAfkIntervals.length}, After: ${notAfkIntervals.length}`);
 
-    // 2. Filter and split events by "not-afk" intervals
+    // 2. Filter and split events by the cleaned "not-afk" intervals
     const activeWindowEvents = windowEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
     const activeStopwatchEvents = stopwatchEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
 
@@ -125,6 +166,7 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents) {
 
     // Build time_view
     const allHourlyEvents = [...hourlySplitWindowEvents, ...hourlySplitStopwatchEvents];
+
     for (const event of allHourlyEvents) {
         const d = new Date(event.timestamp);
         const path = [d.getFullYear(), d.getMonth() + 1, getWeekNumber(d), d.getDate(), d.getHours()];
@@ -170,5 +212,6 @@ self.onmessage = function(e) {
   const { afkEvents, windowEvents, stopwatchEvents } = e.data;
   console.log("Worker received data, starting processing...");
   const processedData = processActivityData(afkEvents, windowEvents, stopwatchEvents);
+  console.log("Final object from worker:", processedData);
   self.postMessage(processedData);
 };
