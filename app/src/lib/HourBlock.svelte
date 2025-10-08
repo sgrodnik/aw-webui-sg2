@@ -2,6 +2,14 @@
   export let hour;
   export let events;
 
+  let sortedEvents = [];
+  // Reactive statement to sort events chronologically whenever the `events` prop changes.
+  $: {
+    if (events) {
+      sortedEvents = [...events].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    }
+  }
+
   function getEventTitle(event) {
     if (event.data.label) {
       return `[ЗАДАЧА] ${event.data.label}`;
@@ -37,9 +45,9 @@
 <div class="hour-block">
   <h3>Час: {hour}</h3>
 
-  {#if events.length > 0}
+  {#if sortedEvents.length > 0}
     <div class="timeline-container">
-      {#each events as event (event.id + event.timestamp)}
+      {#each sortedEvents as event (event.id + event.timestamp)}
         <div
           class="event-bar"
           style={getEventPosition(event)}
@@ -51,7 +59,7 @@
     <details class="details-spoiler">
       <summary>Детали</summary>
       <ul class="event-list">
-        {#each events as event (event.id + event.timestamp)}
+        {#each sortedEvents as event (event.id + event.timestamp)}
           <li>
             <span class="event-time">{formatTime(event.timestamp)}</span>
             <span class="event-title" title={getEventTitle(event)}>{getEventTitle(event)}</span>
