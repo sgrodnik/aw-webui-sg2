@@ -18,6 +18,7 @@ The application is a single-page application (SPA) that runs entirely in the bro
 *   `app/src/lib/apiClient.js`: A module responsible for all communication with the ActivityWatch REST API. It handles fetching events from the server.
 *   `app/src/lib/dataProcessor.js`: The core of the application's logic. This module is responsible for processing the raw data from ActivityWatch (filtering, splitting, aggregating) and ensuring data integrity by cleaning and analyzing events for inconsistencies. Its rules are defined in `input/anchor-context.md`.
 *   `app/src/lib/dataProcessor.worker.js`: Contains the core data processing logic that runs in a background Web Worker to prevent UI freezes.
+*   `app/src/lib/DatePicker.svelte`: A UI component that allows the user to select a date for analysis.
 *   `app/src/main.js`: The entry point for the frontend application, responsible for initializing the Svelte app.
 *   `app/package.json`: Lists the project's dependencies and defines scripts for building, developing, and testing.
 *   `input/*.json`: Sample data from the ActivityWatch API. These files can be used to understand the structure of the data returned by the API.

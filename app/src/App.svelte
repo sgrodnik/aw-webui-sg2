@@ -3,12 +3,17 @@
   import { getEvents } from './lib/apiClient.js';
   import { processActivityData } from './lib/dataProcessor.js';
   import TimelineView from './lib/TimelineView.svelte';
+  import DatePicker from './lib/DatePicker.svelte';
 
   let buckets = null;
   let corsError = false;
   let origin = '';
   let processedData = null;
   let isLoading = true;
+  let selectedDate = new Date();
+
+  // Reactive statement that re-runs the pipeline whenever selectedDate changes
+  $: if (buckets) loadAndProcessEvents(selectedDate);
 
   /**
    * Finds a bucket ID from the buckets object based on the client name.
@@ -23,11 +28,13 @@
   }
 
   /**
-   * Main data fetching and processing pipeline.
+   * Main data fetching and processing pipeline for a specific date.
+   * @param {Date} date The date to fetch and process data for.
    */
-  async function loadAndProcessEvents() {
-    console.log("Starting data processing pipeline...");
+  async function loadAndProcessEvents(date) {
+    console.log(`Starting data processing pipeline for ${date.toISOString().slice(0, 10)}...`);
     isLoading = true;
+    processedData = null; // Clear previous data
 
     // Dynamically find bucket IDs from the fetched list
     const BUCKET_AFK_ID = findBucketId(buckets, 'aw-watcher-afk');
@@ -47,9 +54,9 @@
 
     console.log("Successfully found bucket IDs:", { afk: BUCKET_AFK_ID, window: BUCKET_WINDOW_ID, stopwatch: BUCKET_STOPWATCH_ID });
 
-    // Define a time range for the query.
-    const startTime = new Date('2025-10-03T00:00:00Z').toISOString();
-    const endTime   = new Date('2025-10-03T23:59:59Z').toISOString();
+    // Define the time range based on the selected date
+    const startTime = new Date(date.setHours(0, 0, 0, 0)).toISOString();
+    const endTime   = new Date(date.setHours(23, 59, 59, 999)).toISOString();
 
     console.log(`Fetching events from ${startTime} to ${endTime}`);
 
@@ -87,8 +94,7 @@
       buckets = await response.json();
       console.log('Success! Bucket list received:', buckets);
 
-      // After successfully getting the bucket list, start the main processing pipeline.
-      await loadAndProcessEvents();
+      // The reactive statement will trigger the first data load automatically
 
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -132,12 +138,16 @@ cors_origins = "http://localhost:8000,{origin}"
         После сохранения файла перезапустите сервер ActivityWatch и обновите эту страницу.
       </p>
     </div>
-  {:else if isLoading}
-    <p>Загрузка и обработка данных...</p>
-  {:else if processedData}
-    <TimelineView data={processedData} />
   {:else}
-    <p>Нет данных для отображения.</p>
+    <DatePicker bind:selectedDate={selectedDate} />
+    
+    {#if isLoading}
+      <p>Загрузка и обработка данных...</p>
+    {:else if processedData && processedData.time_view && Object.keys(processedData.time_view).length > 0}
+      <TimelineView data={processedData} />
+    {:else}
+      <p>Нет данных для отображения за {selectedDate.toLocaleDateString()}.</p>
+    {/if}
   {/if}
 </main>
 
