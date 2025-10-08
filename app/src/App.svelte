@@ -154,7 +154,7 @@ cors_origins = "http://localhost:8000,{origin}"
 <style>
   main {
     text-align: left;
-    max-width: 800px;
+    padding: 0;
   }
 
   .error-heading {
