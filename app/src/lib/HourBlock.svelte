@@ -1,12 +1,11 @@
 <script>
-  export let hour;
-  export let events;
+  export let allEvents;
 
   let sortedEvents = [];
-  // Reactive statement to sort events chronologically whenever the `events` prop changes.
+  // Reactive statement to sort events chronologically whenever the `allEvents` prop changes.
   $: {
-    if (events) {
-      sortedEvents = [...events].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    if (allEvents) {
+      sortedEvents = [...allEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     }
   }
 
@@ -32,32 +31,12 @@
     const date = new Date(timestamp);
     return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
-
-  function getEventPosition(event) {
-    const start = new Date(event.timestamp);
-    const startSecondsInHour = start.getMinutes() * 60 + start.getSeconds();
-    const left = (startSecondsInHour / 3600) * 100;
-    const width = (event.duration / 3600) * 100;
-    return `left: ${left}%; width: ${width}%;`;
-  }
 </script>
 
-<div class="hour-block">
-  <h3>Час: {hour}</h3>
-
+<div class="hour-details">
   {#if sortedEvents.length > 0}
-    <div class="timeline-container">
-      {#each sortedEvents as event (event.id + event.timestamp)}
-        <div
-          class="event-bar"
-          style={getEventPosition(event)}
-          title={`${getEventTitle(event)} (${formatDuration(event.duration)})`}
-        ></div>
-      {/each}
-    </div>
-
     <details class="details-spoiler">
-      <summary>Детали</summary>
+      <summary>Детали ({sortedEvents.length} событий)</summary>
       <ul class="event-list">
         {#each sortedEvents as event (event.id + event.timestamp)}
           <li>
@@ -68,55 +47,18 @@
         {/each}
       </ul>
     </details>
-
   {:else}
     <p class="no-activity">(Нет активности)</p>
   {/if}
 </div>
 
 <style>
-  /* Inspired by style.css from the user's reference project */
-  .hour-block {
-    background-color: #ffffff; /* --color-card-bg */
-    border: 1px solid #ccc;    /* --color-border */
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* --color-shadow */
-    padding: 15px;
-    margin-bottom: 1.5rem;
-  }
-  h3 {
-    margin-top: 0;
-    font-size: 1.2em;
-    border-bottom: 1px solid #eee; /* --color-header-border */
-    padding-bottom: 10px;
-    margin-bottom: 10px;
-    color: #212529; /* --color-text */
+  .hour-details {
+    margin-top: 1rem;
   }
   .no-activity {
     color: #6c757d; /* --color-text-muted */
     font-style: italic;
-  }
-
-  /* Timeline styles */
-  .timeline-container {
-    position: relative;
-    height: 20px;
-    background-color: #f0f0f0; /* --color-bg */
-    border-radius: 4px;
-    margin-top: 10px;
-    width: 100%;
-  }
-  .event-bar {
-    position: absolute;
-    height: 100%;
-    background-color: #4db6ac; /* A pleasant color from the user's themes (mint) */
-    border-radius: 3px;
-    opacity: 0.8;
-    cursor: pointer;
-    transition: opacity 0.2s ease;
-  }
-  .event-bar:hover {
-    opacity: 1;
   }
 
   /* Spoiler and List styles */
