@@ -60,14 +60,19 @@ function analyzeWindowOverlaps(windowEvents) {
 /**
  * Heals small gaps between window events that occur during a not-afk session
  * by extending the duration of the preceding event.
+ * This version uses a single-pass algorithm for better performance.
  * @param {Array<object>} windowEvents The window events to process.
  * @param {Array<object>} afkEvents The AFK events for status checking.
  * @returns {Array<object>} The healed array of window events.
  */
 function healWindowGaps(windowEvents, afkEvents) {
+    // Ensure both arrays are sorted by timestamp as a prerequisite
     const sortedEvents = [...windowEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const sortedAfkEvents = [...afkEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
     const MAX_GAP_TO_HEAL_SECONDS = 10;
     let healedCount = 0;
+    let afkIndex = 0; // Pointer for the sortedAfkEvents array
 
     for (let i = 0; i < sortedEvents.length - 1; i++) {
         const event1 = sortedEvents[i];
@@ -78,16 +83,25 @@ function healWindowGaps(windowEvents, afkEvents) {
         const gap = (start2 - end1) / 1000;
 
         if (gap > 0 && gap <= MAX_GAP_TO_HEAL_SECONDS) {
-            const gapStartStatus = getAfkStatusAt(end1, afkEvents);
-            const gapEndStatus = getAfkStatusAt(start2, afkEvents);
+            // Advance the afkIndex to the AFK event that could contain our gap time
+            while (afkIndex < sortedAfkEvents.length - 1 && (new Date(sortedAfkEvents[afkIndex].timestamp).getTime() + sortedAfkEvents[afkIndex].duration * 1000) < end1) {
+                afkIndex++;
+            }
 
-            if (gapStartStatus === 'not-afk' && gapEndStatus === 'not-afk') {
-                // Extend the duration of the first event to cover the gap
-                event1.duration += gap;
-                healedCount++;
+            const relevantAfkEvent = sortedAfkEvents[afkIndex];
+            if (relevantAfkEvent && relevantAfkEvent.data.status === 'not-afk') {
+                const afkStart = new Date(relevantAfkEvent.timestamp).getTime();
+                const afkEnd = afkStart + relevantAfkEvent.duration * 1000;
+
+                // Check if the entire gap is contained within this single not-afk event
+                if (end1 >= afkStart && start2 <= afkEnd) {
+                    event1.duration += gap;
+                    healedCount++;
+                }
             }
         }
     }
+
     if (healedCount > 0) {
         console.log(`[Data Fix] Healed ${healedCount} gaps (<= ${MAX_GAP_TO_HEAL_SECONDS}s) in not-afk sessions.`);
     }
