@@ -19,8 +19,8 @@ The application is a single-page application (SPA) that runs entirely in the bro
 *   `app/src/lib/dataProcessor.js`: The core of the application's logic. This module is responsible for fetching raw data from ActivityWatch, filtering it by activity, cleaning inconsistencies, and transforming it into two separate data models for the UI: a clean "aggregated" view (with short events grouped into meta-events) and a raw "detailed" view.
 *   `app/src/lib/dataProcessor.worker.js`: A parallel implementation of `dataProcessor.js` designed to run in a background Web Worker, ensuring the UI remains responsive during heavy data processing.
 *   `app/src/lib/DatePicker.svelte`: A UI component that allows the user to select a date for analysis.
-*   `app/src/lib/TimelineView.svelte`: The main view component that receives data for a whole day. It iterates over each hour and passes the corresponding data chunks to individual `HourBlock` components.
-*   `app/src/lib/HourBlock.svelte`: A component that renders all tracks for a single hour. It displays the graphical timeline track for a given set of events (using `EventBar`) and also provides a collapsible text-based list for detailed inspection.
+*   `app/src/lib/TimelineView.svelte`: The main view component that orchestrates the hourly layout. It receives data for a whole day, iterates over each hour, and arranges multiple `HourBlock` timeline tracks into a compact view. It also contains the logic for the collapsible details list for each hour.
+*   `app/src/lib/HourBlock.svelte`: A simple, reusable component that renders a single graphical timeline track for a given set of events.
 *   `app/src/lib/EventBar.svelte`: A component responsible for the visual representation of a single event. It also contains complex logic for generating detailed, multi-level tooltips, especially for aggregated "meta-events".
 *   `app/src/main.js`: The entry point for the frontend application, responsible for initializing the Svelte app.
 *   `app/package.json`: Lists the project's dependencies and defines scripts for building, developing, and testing.
