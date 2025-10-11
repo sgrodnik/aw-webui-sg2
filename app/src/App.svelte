@@ -1,14 +1,16 @@
 <script>
   import { onMount } from 'svelte';
   import { getEvents } from './lib/apiClient.js';
-  import { processActivityData } from './lib/dataProcessor.js';
+  import DataWorker from './lib/dataProcessor.worker.js?worker';
   import TimelineView from './lib/TimelineView.svelte';
   import DatePicker from './lib/DatePicker.svelte';
+
+  const worker = new DataWorker();
 
   let buckets = null;
   let corsError = false;
   let origin = '';
-  let processedData = null;
+  let processedData = {};
   let isLoading = true;
   let selectedDate = new Date();
   let aggregationThreshold = 30; // Default threshold in seconds
@@ -17,7 +19,23 @@
   let rawAfkEvents = [];
   let rawWindowEvents = [];
 
-  // Reactive statement that re-runs the pipeline whenever selectedDate or aggregationThreshold changes
+  // Helper function to get week number, must be consistent with the worker
+  function getWeekNumber(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return weekNo;
+  }
+
+  // Reactive statements to derive date parts and the data for the selected day
+  $: year = selectedDate.getFullYear();
+  $: month = selectedDate.getMonth() + 1;
+  $: day = selectedDate.getDate();
+  $: week = getWeekNumber(selectedDate);
+  $: timeViewForDay = processedData?.time_view?.[year]?.[month]?.[week]?.[day] || {};
+
+  // Re-runs the pipeline whenever selectedDate or aggregationThreshold changes
   $: if (buckets) loadAndProcessEvents(selectedDate, aggregationThreshold);
 
   /**
@@ -68,60 +86,53 @@
   async function loadAndProcessEvents(date, threshold) {
     console.log(`Starting data processing pipeline for ${date.toISOString().slice(0, 10)} with threshold ${threshold}s...`);
     isLoading = true;
-    processedData = null; // Clear previous data
-    rawAfkEvents = [];
-    rawWindowEvents = [];
+    processedData = {}; // Clear previous data
 
-    // Dynamically find bucket IDs from the fetched list
     const BUCKET_AFK_ID = findBucketId(buckets, 'aw-watcher-afk');
     const BUCKET_WINDOW_ID = findBucketId(buckets, 'aw-watcher-window');
-    // The stopwatch bucket is special, its client is often 'aw-webui' but its ID is just 'aw-stopwatch'
     const BUCKET_STOPWATCH_ID = buckets['aw-stopwatch'] ? 'aw-stopwatch' : findBucketId(buckets, 'aw-stopwatch');
 
     if (!BUCKET_AFK_ID || !BUCKET_WINDOW_ID || !BUCKET_STOPWATCH_ID) {
-        console.error("Could not find all required buckets. Aborting processing.", {
-            afk: BUCKET_AFK_ID,
-            window: BUCKET_WINDOW_ID,
-            stopwatch: BUCKET_STOPWATCH_ID
-        });
+        console.error("Could not find all required buckets. Aborting processing.");
         isLoading = false;
-        return; // Stop execution if buckets aren't found
+        return;
     }
 
-    console.log("Successfully found bucket IDs:", { afk: BUCKET_AFK_ID, window: BUCKET_WINDOW_ID, stopwatch: BUCKET_STOPWATCH_ID });
-
-    // Define the time range based on the selected date
     const startTime = new Date(date.setHours(0, 0, 0, 0)).toISOString();
     const endTime   = new Date(date.setHours(23, 59, 59, 999)).toISOString();
 
-    console.log(`Fetching events from ${startTime} to ${endTime}`);
-
     try {
-      // Fetch all event types in parallel for efficiency.
       const [afkEvents, windowEvents, stopwatchEvents] = await Promise.all([
         getEvents(BUCKET_AFK_ID, startTime, endTime),
         getEvents(BUCKET_WINDOW_ID, startTime, endTime),
         getEvents(BUCKET_STOPWATCH_ID, startTime, endTime)
       ]);
 
-      // Store raw data for debugging purposes
       rawAfkEvents = afkEvents;
       rawWindowEvents = windowEvents;
 
-      // Pass the raw data to the processor and store it in the state.
-      processedData = await processActivityData(afkEvents, windowEvents, stopwatchEvents, threshold);
-
-      console.log("--- PIPELINE FINISHED ---");
-      console.log("Final processed data:", processedData);
+      console.log("Sending data to worker for processing...");
+      worker.postMessage({
+        afkEvents,
+        windowEvents,
+        stopwatchEvents,
+        aggregationThreshold: threshold
+      });
 
     } catch (error) {
-      console.error("An error occurred during the data processing pipeline:", error);
-    } finally {
+      console.error("An error occurred during the data fetching:", error);
       isLoading = false;
     }
   }
 
   onMount(async () => {
+    worker.onmessage = (event) => {
+      console.log("Main thread received processed data from worker.");
+      processedData = event.data;
+      isLoading = false;
+      console.log("--- PIPELINE FINISHED ---");
+    };
+
     if (typeof window !== 'undefined') {
       origin = window.location.origin;
     }
@@ -133,8 +144,6 @@
       }
       buckets = await response.json();
       console.log('Success! Bucket list received:', buckets);
-
-      // The reactive statement will trigger the first data load automatically
 
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -190,8 +199,8 @@ cors_origins = "http://localhost:8000,{origin}"
     
     {#if isLoading}
       <p>Загрузка и обработка данных...</p>
-    {:else if processedData && processedData.time_view && Object.keys(processedData.time_view).length > 0}
-      <TimelineView data={processedData} threshold={aggregationThreshold} />
+    {:else if timeViewForDay && Object.keys(timeViewForDay).length > 0}
+      <TimelineView {timeViewForDay} />
     {:else}
       <p>Нет данных для отображения за {selectedDate.toLocaleDateString()}.</p>
     {/if}

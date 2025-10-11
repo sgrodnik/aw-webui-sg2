@@ -1,11 +1,13 @@
 <script>
-  export let allEvents;
+  import EventBar from './EventBar.svelte';
+  export let events;
+  export let title;
 
   let sortedEvents = [];
-  // Reactive statement to sort events chronologically whenever the `allEvents` prop changes.
+  // Reactive statement to sort events chronologically whenever the `events` prop changes.
   $: {
-    if (allEvents) {
-      sortedEvents = [...allEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    if (events) {
+      sortedEvents = [...events].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     }
   }
 
@@ -33,47 +35,79 @@
   }
 </script>
 
-<div class="hour-details">
-  {#if sortedEvents.length > 0}
-    <details class="details-spoiler">
-      <summary>Детали ({sortedEvents.length} событий)</summary>
-      <ul class="event-list">
-        {#each sortedEvents as event (event.id + event.timestamp)}
-          <li>
-            <span class="event-time">{formatTime(event.timestamp)}</span>
-            <span class="event-title" title={getEventTitle(event)}>{getEventTitle(event)}</span>
-            <span class="event-duration">{formatDuration(event.duration)}</span>
-          </li>
-        {/each}
-      </ul>
-    </details>
-  {:else}
-    <p class="no-activity">(Нет активности)</p>
-  {/if}
+<div class="hour-block">
+  <h4 class="track-title">{title}</h4>
+  <div class="timeline-track">
+    {#if events && events.length > 0}
+      {#each events as event (event.id + event.timestamp)} 
+        <EventBar {event} />
+      {/each}
+    {:else}
+      <p class="no-activity-track">(Нет активности)</p>
+    {/if}
+  </div>
+
+  <div class="hour-details">
+    {#if sortedEvents.length > 0}
+      <details class="details-spoiler">
+        <summary>Детали ({sortedEvents.length} событий)</summary>
+        <ul class="event-list">
+          {#each sortedEvents as event (event.id + event.timestamp)}
+            <li>
+              <span class="event-time">{formatTime(event.timestamp)}</span>
+              <span class="event-title" title={getEventTitle(event)}>{getEventTitle(event)}</span>
+              <span class="event-duration">{formatDuration(event.duration)}</span>
+            </li>
+          {/each}
+        </ul>
+      </details>
+    {/if}
+  </div>
 </div>
 
 <style>
-  .hour-details {
-    margin-top: 1rem;
+  .hour-block {
+    margin-bottom: 1rem;
   }
-  .no-activity {
-    color: #6c757d; /* --color-text-muted */
+  .track-title {
+    font-size: 0.9em;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+    font-weight: normal;
+  }
+  .timeline-track {
+    position: relative;
+    width: 100%;
+    height: 20px; 
+    background-color: #f0f0f0;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+  }
+  .no-activity-track {
+    position: absolute;
+    left: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9e9e9e;
     font-style: italic;
+    font-size: 0.8em;
+    margin: 0;
   }
 
-  /* Spoiler and List styles */
-  .details-spoiler {
-    margin-top: 1rem;
+  /* Details List Styles */
+  .hour-details {
+    margin-top: 0.5rem;
   }
   .details-spoiler summary {
     cursor: pointer;
     font-weight: bold;
-    color: #6c757d; /* --color-text-muted */
-    font-size: 0.9em;
+    color: #6c757d;
+    font-size: 0.8em;
+    padding: 0.25rem;
   }
   .event-list {
     list-style-type: none;
-    padding-left: 0;
+    padding-left: 1rem;
     margin-top: 0.5rem;
   }
   li {
@@ -81,9 +115,10 @@
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #f0f0f0; /* A lighter separator */
-    color: #212529; /* --color-text */
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #f0f0f0;
+    color: #212529;
+    font-size: 0.85em;
   }
   li:last-child {
     border-bottom: none;
@@ -91,20 +126,17 @@
   .event-time {
     flex-shrink: 0;
     font-family: monospace;
-    font-size: 0.9em;
-    color: #6c757d; /* --color-text-muted */
+    color: #6c757d;
   }
   .event-title {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     flex-grow: 1;
-    font-size: 0.9em;
   }
   .event-duration {
     flex-shrink: 0;
     font-weight: bold;
-    color: #6c757d; /* --color-text-muted */
-    font-size: 0.9em;
+    color: #6c757d;
   }
 </style>
