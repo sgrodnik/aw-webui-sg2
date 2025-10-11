@@ -99,12 +99,12 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    margin-top: 4px;
+    margin-top: 2px;
   }
   .timelines-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 4px; /* Space between timelines */
+    gap: 2px; /* Space between timelines */
   }
 
   /* Details List Styles */
