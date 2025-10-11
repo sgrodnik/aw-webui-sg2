@@ -11,6 +11,8 @@ This project is a web-based user interface for ActivityWatch, an open-source aut
 
 The application is a single-page application (SPA) that runs entirely in the browser. It communicates with a local ActivityWatch server to fetch data. Its core feature is a decoupled processing pipeline: a central data processor (`dataProcessor.js`) fetches raw events and transforms them into two independent, view-ready data models: a clean "aggregated" view and a raw "detailed" view. This ensures that the UI components are simple and only responsible for displaying data, not processing it. A Web Worker (`dataProcessor.worker.js`) provides a parallel implementation for background processing.
 
+UI-specific state that needs to be shared across components, such as the identifier for the currently highlighted event, is managed by separate, simple Svelte stores (e.g., `highlightStore.js`). This keeps global UI state decoupled from the main data processing pipeline.
+
 ## Key Files
 
 *   `input/swagger.json`: The OpenAPI (Swagger) 2.0 specification for the ActivityWatch REST API. This is the most important file in the project, as it describes all the available API endpoints, their parameters, and their responses.
@@ -23,7 +25,8 @@ The application is a single-page application (SPA) that runs entirely in the bro
 *   `app/src/lib/HourBlock.svelte`: A component that displays a collapsible list of all events within a single hour.
 *   `app/src/lib/HourSummary.svelte`: A UI component that renders the hour summary, showing a breakdown of time spent per application and task.
 *   `app/src/lib/StackedBarChart.svelte`: A minimalist component for rendering a stacked bar chart, used for visualizing hourly time distribution.
-*   `app/src/lib/EventBar.svelte`: A component responsible for the visual representation of a single event on a timeline track.
+*   `app/src/lib/EventBar.svelte`: A component responsible for the visual representation of a single event on a timeline track. It also contains the logic for the hover-highlighting feature, reacting to changes in `highlightStore.js` and applying styles via CSS custom properties.
+*   `app/src/lib/highlightStore.js`: A Svelte store that holds the identifier of the currently hovered event, enabling the cross-component highlighting feature.
 *   `app/src/lib/timeUtils.js`: A utility module for shared time-related functions, like formatting durations.
 *   `app/src/main.js`: The entry point for the frontend application, responsible for initializing the Svelte app.
 *   `app/package.json`: Lists the project's dependencies and defines scripts for building, developing, and testing.

@@ -1,11 +1,46 @@
 <script>
     import { createEventDispatcher } from 'svelte';
     import { formatDuration } from './timeUtils.js';
+    import { highlightedIdentifier } from './highlightStore.js';
 
     export let event;
     export let track = 'detailed'; // detailed, aggregated, tasks
 
     const dispatch = createEventDispatcher();
+
+    /**
+     * A simple and fast string hashing function (sdbm).
+     * @param {string} str The string to hash.
+     * @returns {number} A 32-bit integer hash.
+     */
+    function sdbm(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + (hash << 6) + (hash << 16) - hash;
+        }
+        return hash >>> 0; // Ensure positive 32-bit integer
+    }
+
+    function getEventIdentifier(event) {
+        if (event.data.is_aggregated) {
+            return `aggregated::${event.id}`;
+        }
+        if (event.data.label) { // Task Event
+            return `task::${event.data.label}`;
+        }
+        // Window Event
+        return `window::${event.data.app}::${event.data.title}`;
+    }
+
+    const identifierHash = sdbm(getEventIdentifier(event));
+
+    function handleMouseover() {
+        highlightedIdentifier.set(identifierHash);
+    }
+
+    function handleMouseout() {
+        highlightedIdentifier.set(null);
+    }
 
   function formatTitle(event) {
     const titleId = `ID: ${event.id}`;
@@ -88,7 +123,11 @@
   class="event-bar"
   class:aggregated={event.data.is_aggregated}
   style={getEventPosition(event)}
+  style:--highlight-opacity={$highlightedIdentifier === identifierHash ? 1 : 0.8}
+  style:--highlight-border-color={$highlightedIdentifier === identifierHash ? 'rgba(0,0,0,0.5)' : 'transparent'}
   title={formatTitle(event)}
+  on:mouseover={handleMouseover}
+  on:mouseout={handleMouseout}
 ></div>
 
 <style>
@@ -97,14 +136,15 @@
     height: 100%;
     background-color: #4db6ac; /* A pleasant color from the user's themes (mint) */
     border-radius: 3px;
-    opacity: 0.8;
+    opacity: var(--highlight-opacity, 0.8);
     cursor: pointer;
-    transition: opacity 0.2s ease;
     box-sizing: border-box;
+    border: 1px solid var(--highlight-border-color, transparent);
   }
   .event-bar:hover {
     opacity: 1;
-    border: 1px solid rgba(0,0,0,0.5);
+    border-color: rgba(0,0,0,0.5);
+    transition: none; /* Apply instantly and override the main transition */
   }
 
   /* Style for aggregated meta-events */
