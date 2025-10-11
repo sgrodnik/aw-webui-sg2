@@ -257,6 +257,53 @@ function splitEventByHour(event) {
 }
 
 /**
+ * Cleans up window event titles based on a set of rules.
+ * @param {object} event The event object.
+ * @returns {object} The event with a sanitized title.
+ */
+const simpleSuffixRules = {
+    'chrome.exe': ' - Google Chrome',
+    'Notepad3.exe': ' - Notepad3',
+    'Code.exe': ' - Visual Studio Code'
+};
+
+function sanitizeEventTitle(event) {
+    if (!event.data || !event.data.title) {
+        return event;
+    }
+
+    let title = event.data.title;
+    const app = event.data.app;
+
+    // Rule 1: Remove leading special characters (●, *) and subsequent spaces.
+    title = title.replace(/^[●*]+\s*/, '');
+
+    // Rule 2: App-specific title cleaning
+    if (app === 'Code.exe' || app === 'code') {
+        // Hardcoded special case for VS Code
+        title = title.replace(/\s*\(Working Tree\)\s*\(.*\)/, '');
+    }
+
+    // Handle simple suffix removals from the rule set
+    const suffix = simpleSuffixRules[app];
+    if (suffix) {
+        // Escape special characters in suffix for RegExp and remove it from the end of the string
+        const escapedSuffix = suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        title = title.replace(new RegExp(escapedSuffix + '$'), '');
+    }
+
+
+    // Return a new event object with the sanitized title.
+    return {
+        ...event,
+        data: {
+            ...event.data,
+            title: title.trim()
+        }
+    };
+}
+
+/**
  * Main processing function.
  */
 function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregationThreshold) {
@@ -270,8 +317,11 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregati
             })
     );
 
-    const activeWindowEvents = windowEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
+    let activeWindowEvents = windowEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
     const activeStopwatchEvents = stopwatchEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
+
+    // Sanitize window event titles
+    activeWindowEvents = activeWindowEvents.map(sanitizeEventTitle);
 
     analyzeWindowOverlaps(activeWindowEvents);
     analyzeTaskOverlaps(activeStopwatchEvents);
