@@ -1,13 +1,11 @@
 <script>
-  export let event;
+    import { createEventDispatcher } from 'svelte';
+    import { formatDuration } from './timeUtils.js';
 
-  function formatDuration(seconds) {
-    if (seconds < 1) return '< 1s';
-    if (seconds < 60) return `${Math.round(seconds)}s`;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.round(seconds % 60);
-    return `${minutes}m ${remainingSeconds}s`;
-  }
+    export let event;
+    export let track = 'detailed'; // detailed, aggregated, tasks
+
+    const dispatch = createEventDispatcher();
 
   function formatTitle(event) {
     const titleId = `ID: ${event.id}`;

@@ -1,5 +1,7 @@
 <script>
   import HourBlock from './HourBlock.svelte';
+  import HourSummary from './HourSummary.svelte';
+  import { formatDuration } from './timeUtils.js';
 
   export let timeViewForDay;
 
@@ -19,14 +21,6 @@
     return 'Unknown Event';
   }
 
-  function formatDuration(seconds) {
-    if (seconds < 1) return '< 1s';
-    if (seconds < 60) return `${Math.round(seconds)}s`;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.round(seconds % 60);
-    return `${minutes}m ${remainingSeconds}s`;
-  }
-
   function formatTime(timestamp) {
     const date = new Date(timestamp);
     return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -39,11 +33,13 @@
   {:else}
     {#each Object.entries(timeViewForDay).sort((a, b) => parseInt(a[0]) - parseInt(b[0])) as [hour, hourData] (hour)}
       {@const detailedEvents = getDetailedWindowEvents(hourData.detailed)}
+      {@const taskEvents = getTaskEvents(hourData.tasks)}
       {@const sortedDetailedEvents = [...detailedEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))}
+      {@const hourSummary = hourData.summary || []}
 
       <div class="hour-container">
         <div class="timelines-wrapper">
-          <HourBlock events={getTaskEvents(hourData.tasks)} />
+          <HourBlock events={taskEvents} />
           <HourBlock events={detailedEvents} />
           <HourBlock events={getAggregatedWindowEvents(hourData.aggregated)} />
         </div>
@@ -52,6 +48,9 @@
           <div class="hour-details">
             <details class="details-spoiler">
               <summary>Детали (час: {hour}, {sortedDetailedEvents.length} событий)</summary>
+              
+              <HourSummary summary={hourSummary} />
+
               <ul class="event-list">
                 {#each sortedDetailedEvents as event (event.id + event.timestamp)}
                   <li>

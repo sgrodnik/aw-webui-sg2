@@ -304,6 +304,54 @@ function sanitizeEventTitle(event) {
 }
 
 /**
+ * Calculates a summary of activity for a given set of events.
+ */
+function calculateHourSummary(detailedEvents, taskEvents) {
+    const summary = {};
+    const allEvents = [...detailedEvents, ...taskEvents];
+    const totalHourDuration = allEvents.reduce((acc, e) => acc + e.duration, 0);
+
+    if (totalHourDuration === 0) {
+        return [];
+    }
+
+    for (const event of detailedEvents) {
+        const app = event.data.app;
+        if (!summary[app]) {
+            summary[app] = { name: app, totalDuration: 0, titles: {} };
+        }
+        summary[app].totalDuration += event.duration;
+        const title = event.data.title || '[No Title]';
+        if (!summary[app].titles[title]) {
+            summary[app].titles[title] = 0;
+        }
+        summary[app].titles[title] += event.duration;
+    }
+
+    for (const event of taskEvents) {
+        const label = event.data.label;
+        if (!summary[label]) {
+            summary[label] = { name: label, totalDuration: 0, titles: {} };
+        }
+        summary[label].totalDuration += event.duration;
+    }
+
+    const summaryArray = Object.values(summary).map(item => {
+        const titlesArray = Object.entries(item.titles)
+            .map(([title, duration]) => ({ title, duration }))
+            .sort((a, b) => b.duration - a.duration);
+        
+        return {
+            ...item,
+            percentage: (item.totalDuration / totalHourDuration) * 100,
+            titles: titlesArray
+        };
+    });
+
+    return summaryArray.sort((a, b) => b.totalDuration - a.totalDuration);
+}
+
+/**
  * Main processing function.
  */
 function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregationThreshold) {
@@ -340,7 +388,7 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregati
             const key = path[i];
             if (!schema[key]) {
                 if (i === path.length - 1) {
-                    schema[key] = { detailed: [], aggregated: [], tasks: [] };
+                    schema[key] = { detailed: [], aggregated: [], tasks: [], summary: [] };
                 } else {
                     schema[key] = {};
                 }
@@ -369,6 +417,20 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregati
         const path = [d.getFullYear(), d.getMonth() + 1, getWeekNumber(d), d.getDate(), d.getHours()];
         const hourObject = ensureHourPath(path);
         hourObject.tasks.push(event);
+    }
+
+    // Final step: Calculate summaries for each hour
+    for (const year in time_view) {
+        for (const month in time_view[year]) {
+            for (const week in time_view[year][month]) {
+                for (const day in time_view[year][month][week]) {
+                    for (const hour in time_view[year][month][week][day]) {
+                        const hourData = time_view[year][month][week][day][hour];
+                        hourData.summary = calculateHourSummary(hourData.detailed, hourData.tasks);
+                    }
+                }
+            }
+        }
     }
 
     const task_view = {};
