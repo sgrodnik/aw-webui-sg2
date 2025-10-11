@@ -8,34 +8,8 @@
 
     const dispatch = createEventDispatcher();
 
-    /**
-     * A simple and fast string hashing function (sdbm).
-     * @param {string} str The string to hash.
-     * @returns {number} A 32-bit integer hash.
-     */
-    function sdbm(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = str.charCodeAt(i) + (hash << 6) + (hash << 16) - hash;
-        }
-        return hash >>> 0; // Ensure positive 32-bit integer
-    }
-
-    function getEventIdentifier(event) {
-        if (event.data.is_aggregated) {
-            return `aggregated::${event.id}`;
-        }
-        if (event.data.label) { // Task Event
-            return `task::${event.data.label}`;
-        }
-        // Window Event
-        return `window::${event.data.app}::${event.data.title}`;
-    }
-
-    const identifierHash = sdbm(getEventIdentifier(event));
-
     function handleMouseover() {
-        highlightedIdentifier.set(identifierHash);
+        highlightedIdentifier.set(event.sdbmId);
     }
 
     function handleMouseout() {
@@ -123,8 +97,8 @@
   class="event-bar"
   class:aggregated={event.data.is_aggregated}
   style={getEventPosition(event)}
-  style:--highlight-opacity={$highlightedIdentifier === identifierHash ? 1 : 0.8}
-  style:--highlight-border-color={$highlightedIdentifier === identifierHash ? 'rgba(0,0,0,0.5)' : 'transparent'}
+  style:--highlight-opacity={$highlightedIdentifier === event.sdbmId ? 1 : 0.8}
+  style:--highlight-border-color={$highlightedIdentifier === event.sdbmId ? 'rgba(0,0,0,0.5)' : 'transparent'}
   title={formatTitle(event)}
   on:mouseover={handleMouseover}
   on:mouseout={handleMouseout}

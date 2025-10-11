@@ -52,7 +52,7 @@
 
         <div class="charts-wrapper">
             <StackedBarChart 
-                data={hourSummary.map(d => ({ ...d, name: d.name, duration: d.totalDuration }))} 
+                data={hourSummary.map(d => ({ ...d, duration: d.totalDuration }))} 
             />
             <StackedBarChart 
                 data={byTitleSummary} 

@@ -1,4 +1,45 @@
 /**
+ * A simple and fast string hashing function (sdbm).
+ * @param {string} str The string to hash.
+ * @returns {number} A 32-bit integer hash.
+ */
+function sdbm(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + (hash << 6) + (hash << 16) - hash;
+    }
+    return hash >>> 0; // Ensure positive 32-bit integer
+}
+
+/**
+ * Generates a consistent identifier string for an event based on its type and data.
+ * @param {object} event The event object.
+ * @returns {string} A string identifier.
+ */
+function getEventIdentifier(event) {
+    if (event.data.is_aggregated) {
+        return `aggregated::${event.id}`;
+    }
+    if (event.data.label) { // Task Event
+        return `task::${event.data.label}`;
+    }
+    // Window Event
+    return `window::${event.data.app}::${event.data.title}`;
+}
+
+/**
+ * Attaches a unique, consistent hash ID to an event.
+ * @param {object} event The event to process.
+ * @returns {object} The event with an `sdbmId` property.
+ */
+function addSdbmId(event) {
+    return {
+        ...event,
+        sdbmId: sdbm(getEventIdentifier(event))
+    };
+}
+
+/**
  * Helper to get the ISO week number for a given Date.
  * @param {Date} d The date.
  * @returns {number} The ISO week number.
@@ -280,7 +321,7 @@ function aggregateShortEvents(events, durationThreshold) {
             const title = 'Aggregated Activity';
             const newId = `meta_${groupStart.toISOString()}_${currentGroup.length}`;
 
-            aggregatedEvents.push({
+            const metaEvent = {
                 id: newId,
                 timestamp: groupStart.toISOString(),
                 duration: totalDuration,
@@ -293,7 +334,9 @@ function aggregateShortEvents(events, durationThreshold) {
                     eventCount: currentGroup.length,
                     original_events: currentGroup
                 }
-            });
+            };
+
+            aggregatedEvents.push(addSdbmId(metaEvent));
         } else {
             aggregatedEvents.push(...currentGroup);
         }
@@ -450,15 +493,16 @@ function sanitizeEventTitle(event) {
         title = title.replace(new RegExp(escapedSuffix + '$'), '');
     }
 
-
-    // Return a new event object with the sanitized title.
-    return {
+    const newEvent = {
         ...event,
         data: {
             ...event.data,
             title: title.trim()
         }
     };
+
+    // Recalculate the sdbmId after title changes
+    return addSdbmId(newEvent);
 }
 
 /**
@@ -483,32 +527,32 @@ function calculateHourSummary(detailedEvents, taskEvents, notAfkDuration = 0, sh
     for (const event of detailedEvents) {
         const app = event.data.app;
         if (!summary[app]) {
-            summary[app] = { name: app, totalDuration: 0, titles: {} };
+            summary[app] = { name: app, totalDuration: 0, titles: {}, sdbmId: event.sdbmId };
         }
         summary[app].totalDuration += (parseFloat(event.duration) || 0);
         const title = event.data.title || '[No Title]';
         if (!summary[app].titles[title]) {
-            summary[app].titles[title] = 0;
+            summary[app].titles[title] = { duration: 0, sdbmId: event.sdbmId };
         }
-        summary[app].titles[title] += (parseFloat(event.duration) || 0);
+        summary[app].titles[title].duration += (parseFloat(event.duration) || 0);
     }
 
     for (const event of taskEvents) {
         const label = event.data.label;
         if (!summary[label]) {
-            summary[label] = { name: label, totalDuration: 0, titles: {} };
+            summary[label] = { name: label, totalDuration: 0, titles: {}, sdbmId: event.sdbmId };
         }
         summary[label].totalDuration += (parseFloat(event.duration) || 0);
     }
 
     // Add the calculated AFK time as a summary item if enabled
     if (showAfkInSummary && afkDuration > 0) {
-        summary['AFK'] = { name: 'AFK', totalDuration: afkDuration, titles: { 'AFK': afkDuration } };
+        summary['AFK'] = { name: 'AFK', totalDuration: afkDuration, titles: { 'AFK': { duration: afkDuration, sdbmId: -1 } }, sdbmId: -1 };
     }
 
     const summaryArray = Object.values(summary).map(item => {
         const titlesArray = Object.entries(item.titles)
-            .map(([title, duration]) => ({ title, duration }))
+            .map(([title, titleData]) => ({ title, duration: titleData.duration, sdbmId: titleData.sdbmId }))
             .sort((a, b) => b.duration - a.duration);
         
         return {
@@ -535,8 +579,14 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregati
             })
     );
 
-    let activeWindowEvents = windowEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
-    const activeStopwatchEvents = stopwatchEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
+    // Get active fragments and immediately assign a consistent ID
+    let activeWindowEvents = windowEvents
+        .flatMap(event => getActiveFragments(event, notAfkIntervals))
+        .map(sanitizeEventTitle); // sanitizeEventTitle now also adds the sdbmId
+
+    const activeStopwatchEvents = stopwatchEvents
+        .flatMap(event => getActiveFragments(event, notAfkIntervals))
+        .map(addSdbmId);
 
     // Per user instruction, calculate total not-afk time per hour from the raw source
     const notAfkEvents = afkEvents.filter(e => e.data.status === 'not-afk');
@@ -550,9 +600,6 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregati
         }
         hourlyNotAfkDurations[hourKey] += (parseFloat(event.duration) || 0);
     }
-
-    // Sanitize window event titles
-    activeWindowEvents = activeWindowEvents.map(sanitizeEventTitle);
 
     // Heal gaps before analysis and aggregation
     activeWindowEvents = healWindowGaps(activeWindowEvents, afkEvents);
