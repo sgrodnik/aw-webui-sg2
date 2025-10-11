@@ -57,6 +57,150 @@ function analyzeWindowOverlaps(windowEvents) {
     }
 }
 
+/**
+ * Heals small gaps between window events that occur during a not-afk session
+ * by extending the duration of the preceding event.
+ * @param {Array<object>} windowEvents The window events to process.
+ * @param {Array<object>} afkEvents The AFK events for status checking.
+ * @returns {Array<object>} The healed array of window events.
+ */
+function healWindowGaps(windowEvents, afkEvents) {
+    const sortedEvents = [...windowEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const MAX_GAP_TO_HEAL_SECONDS = 10;
+    let healedCount = 0;
+
+    for (let i = 0; i < sortedEvents.length - 1; i++) {
+        const event1 = sortedEvents[i];
+        const event2 = sortedEvents[i + 1];
+
+        const end1 = new Date(event1.timestamp).getTime() + event1.duration * 1000;
+        const start2 = new Date(event2.timestamp).getTime();
+        const gap = (start2 - end1) / 1000;
+
+        if (gap > 0 && gap <= MAX_GAP_TO_HEAL_SECONDS) {
+            const gapStartStatus = getAfkStatusAt(end1, afkEvents);
+            const gapEndStatus = getAfkStatusAt(start2, afkEvents);
+
+            if (gapStartStatus === 'not-afk' && gapEndStatus === 'not-afk') {
+                // Extend the duration of the first event to cover the gap
+                event1.duration += gap;
+                healedCount++;
+            }
+        }
+    }
+    if (healedCount > 0) {
+        console.log(`[Data Fix] Healed ${healedCount} gaps (<= ${MAX_GAP_TO_HEAL_SECONDS}s) in not-afk sessions.`);
+    }
+    return sortedEvents;
+}
+
+// NOTE: This is a temporary analysis function for investigating data gaps.
+/**
+ * Determines AFK status at a specific timestamp.
+ */
+function getAfkStatusAt(timestamp, afkEvents) {
+    const time = new Date(timestamp).getTime();
+    for (let i = afkEvents.length - 1; i >= 0; i--) {
+        const afkEvent = afkEvents[i];
+        const start = new Date(afkEvent.timestamp).getTime();
+        const end = start + afkEvent.duration * 1000;
+        if (time >= start && time < end) {
+            return afkEvent.data.status;
+        }
+    }
+    return 'unknown';
+}
+
+/**
+ * Calculates and formats gap statistics for a given array of gap durations.
+ */
+function calculateGapStatistics(gaps) {
+    if (!gaps || gaps.length === 0) {
+        return null;
+    }
+
+    const distribution = {
+        '1-2s': 0, '2-3s': 0, '3-4s': 0, '4-5s': 0, '5-10s': 0,
+        '10-30s': 0, '30-60s': 0, '60s+': 0,
+    };
+
+    gaps.forEach(gap => {
+        if (gap <= 2) distribution['1-2s']++;
+        else if (gap <= 3) distribution['2-3s']++;
+        else if (gap <= 4) distribution['3-4s']++;
+        else if (gap <= 5) distribution['4-5s']++;
+        else if (gap <= 10) distribution['5-10s']++;
+        else if (gap <= 30) distribution['10-30s']++;
+        else if (gap <= 60) distribution['30-60s']++;
+        else distribution['60s+']++;
+    });
+
+    const totalGaps = gaps.length;
+    const avgGap = gaps.reduce((sum, val) => sum + val, 0) / totalGaps;
+    const maxGap = Math.max(...gaps);
+
+    return {
+        totalGaps,
+        averageGap: `${avgGap.toFixed(3)}s`,
+        maxGap: `${maxGap.toFixed(3)}s`,
+        distribution
+    };
+}
+
+/**
+ * Analyzes window events for time gaps and logs statistics separated by AFK status.
+ */
+function analyzeWindowGaps(windowEvents, afkEvents) {
+    const sortedEvents = [...windowEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const GAP_THRESHOLD_SECONDS = 1;
+    const not_afk_gaps = [];
+    const other_gaps = [];
+
+    for (let i = 0; i < sortedEvents.length - 1; i++) {
+        const event1 = sortedEvents[i];
+        const event2 = sortedEvents[i + 1];
+
+        const end1 = new Date(event1.timestamp).getTime() + event1.duration * 1000;
+        const start2 = new Date(event2.timestamp).getTime();
+        const gap = (start2 - end1) / 1000;
+
+        if (gap > GAP_THRESHOLD_SECONDS) {
+            const gapStartStatus = getAfkStatusAt(end1, afkEvents);
+            const gapEndStatus = getAfkStatusAt(start2, afkEvents);
+
+            if (gapStartStatus === 'not-afk' && gapEndStatus === 'not-afk') {
+                not_afk_gaps.push(gap);
+            } else {
+                other_gaps.push(gap);
+            }
+            
+            // Conditional logging for gaps between 3 and 10 seconds.
+            if (gap > 3 && gap <= 10) {
+                console.warn(
+                    `[Data Anomaly] Gap detected. Duration: ${gap.toFixed(3)}s`,
+                    { 
+                        event1, 
+                        event2, 
+                        gap_seconds: gap,
+                        afk_status_at_gap_start: gapStartStatus,
+                        afk_status_at_gap_end: gapEndStatus
+                    }
+                );
+            }
+        }
+    }
+
+    const notAfkStats = calculateGapStatistics(not_afk_gaps);
+    if (notAfkStats) {
+        console.log('%c[Gap Analysis: NOT-AFK Gaps]', 'color: blue; font-weight: bold;', notAfkStats);
+    }
+
+    const otherStats = calculateGapStatistics(other_gaps);
+    if (otherStats) {
+        console.log('%c[Gap Analysis: Other Gaps (AFK, Mixed)]', 'color: gray; font-weight: bold;', otherStats);
+    }
+}
+
 // NOTE: This is a permanent analysis function and should not be removed.
 /**
  * Analyzes task events for overlaps and logs them.
@@ -396,7 +540,11 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregati
     // Sanitize window event titles
     activeWindowEvents = activeWindowEvents.map(sanitizeEventTitle);
 
+    // Heal gaps before analysis and aggregation
+    activeWindowEvents = healWindowGaps(activeWindowEvents, afkEvents);
+
     analyzeWindowOverlaps(activeWindowEvents);
+    analyzeWindowGaps(activeWindowEvents, afkEvents); // Temporary gap analysis
     analyzeTaskOverlaps(activeStopwatchEvents);
 
     const aggregatedWindowEvents = aggregateShortEvents([...activeWindowEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)), aggregationThreshold);
