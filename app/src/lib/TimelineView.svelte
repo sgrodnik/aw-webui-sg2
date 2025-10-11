@@ -1,6 +1,7 @@
 <script>
   import HourBlock from './HourBlock.svelte';
   import HourSummary from './HourSummary.svelte';
+  import StackedBarChart from './StackedBarChart.svelte';
   import { formatDuration } from './timeUtils.js';
 
   export let timeViewForDay;
@@ -36,12 +37,26 @@
       {@const taskEvents = getTaskEvents(hourData.tasks)}
       {@const sortedDetailedEvents = [...detailedEvents].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))}
       {@const hourSummary = hourData.summary || []}
+      {@const totalHourDuration = hourSummary.reduce((acc, d) => acc + d.totalDuration, 0)}
+      {@const byTitleSummary = hourSummary
+          .flatMap(app => app.titles || [])
+          .filter(t => t.title !== '[No Title]')
+          .map(t => ({ ...t, percentage: totalHourDuration > 0 ? (t.duration / totalHourDuration) * 100 : 0 }))}
 
       <div class="hour-container">
         <div class="timelines-wrapper">
           <HourBlock events={taskEvents} />
           <HourBlock events={detailedEvents} />
           <HourBlock events={getAggregatedWindowEvents(hourData.aggregated)} />
+        </div>
+
+        <div class="charts-wrapper">
+            <StackedBarChart 
+                data={hourSummary.map(d => ({ ...d, name: d.name, duration: d.totalDuration }))} 
+            />
+            <StackedBarChart 
+                data={byTitleSummary} 
+            />
         </div>
 
         {#if sortedDetailedEvents.length > 0}
@@ -79,6 +94,12 @@
     border: 1px solid #ccc;
     border-radius: 8px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .charts-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 4px;
   }
   .timelines-wrapper {
     display: flex;

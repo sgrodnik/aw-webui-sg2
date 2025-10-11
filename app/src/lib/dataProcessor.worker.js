@@ -306,10 +306,17 @@ function sanitizeEventTitle(event) {
 /**
  * Calculates a summary of activity for a given set of events.
  */
-function calculateHourSummary(detailedEvents, taskEvents) {
+function calculateHourSummary(detailedEvents, taskEvents, notAfkDuration = 0, showAfkInSummary = true) {
     const summary = {};
-    const allEvents = [...detailedEvents, ...taskEvents];
-    const totalHourDuration = allEvents.reduce((acc, e) => acc + e.duration, 0);
+    const totalActiveDuration = [...detailedEvents, ...taskEvents].reduce((acc, e) => acc + (parseFloat(e.duration) || 0), 0);
+
+    let afkDuration = 0;
+    let totalHourDuration = totalActiveDuration;
+
+    if (showAfkInSummary) {
+        afkDuration = Math.max(0, 3600 - notAfkDuration);
+        totalHourDuration = 3600; // Percentages are based on the full hour.
+    }
 
     if (totalHourDuration === 0) {
         return [];
@@ -320,12 +327,12 @@ function calculateHourSummary(detailedEvents, taskEvents) {
         if (!summary[app]) {
             summary[app] = { name: app, totalDuration: 0, titles: {} };
         }
-        summary[app].totalDuration += event.duration;
+        summary[app].totalDuration += (parseFloat(event.duration) || 0);
         const title = event.data.title || '[No Title]';
         if (!summary[app].titles[title]) {
             summary[app].titles[title] = 0;
         }
-        summary[app].titles[title] += event.duration;
+        summary[app].titles[title] += (parseFloat(event.duration) || 0);
     }
 
     for (const event of taskEvents) {
@@ -333,7 +340,12 @@ function calculateHourSummary(detailedEvents, taskEvents) {
         if (!summary[label]) {
             summary[label] = { name: label, totalDuration: 0, titles: {} };
         }
-        summary[label].totalDuration += event.duration;
+        summary[label].totalDuration += (parseFloat(event.duration) || 0);
+    }
+
+    // Add the calculated AFK time as a summary item if enabled
+    if (showAfkInSummary && afkDuration > 0) {
+        summary['AFK'] = { name: 'AFK', totalDuration: afkDuration, titles: { 'AFK': afkDuration } };
     }
 
     const summaryArray = Object.values(summary).map(item => {
@@ -354,7 +366,7 @@ function calculateHourSummary(detailedEvents, taskEvents) {
 /**
  * Main processing function.
  */
-function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregationThreshold) {
+function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregationThreshold, showAfkInSummary) {
     const notAfkIntervals = mergeOverlappingIntervals(
         afkEvents
             .filter(e => e.data.status === 'not-afk')
@@ -367,6 +379,19 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregati
 
     let activeWindowEvents = windowEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
     const activeStopwatchEvents = stopwatchEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
+
+    // Per user instruction, calculate total not-afk time per hour from the raw source
+    const notAfkEvents = afkEvents.filter(e => e.data.status === 'not-afk');
+    const hourlySplitNotAfk = notAfkEvents.flatMap(splitEventByHour);
+    const hourlyNotAfkDurations = {};
+    for (const event of hourlySplitNotAfk) {
+        const d = new Date(event.timestamp);
+        const hourKey = d.getHours(); // Using hour as key for simplicity within a day
+        if (!hourlyNotAfkDurations[hourKey]) {
+            hourlyNotAfkDurations[hourKey] = 0;
+        }
+        hourlyNotAfkDurations[hourKey] += (parseFloat(event.duration) || 0);
+    }
 
     // Sanitize window event titles
     activeWindowEvents = activeWindowEvents.map(sanitizeEventTitle);
@@ -426,7 +451,8 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregati
                 for (const day in time_view[year][month][week]) {
                     for (const hour in time_view[year][month][week][day]) {
                         const hourData = time_view[year][month][week][day][hour];
-                        hourData.summary = calculateHourSummary(hourData.detailed, hourData.tasks);
+                        const notAfkDuration = hourlyNotAfkDurations[hour] || 0;
+                        hourData.summary = calculateHourSummary(hourData.detailed, hourData.tasks, notAfkDuration, showAfkInSummary);
                     }
                 }
             }
@@ -463,11 +489,14 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregati
         }
     }
 
-    return { time_view, task_view };
+    self.postMessage({ time_view, task_view });
 }
 
-self.onmessage = function(e) {
-  const { afkEvents, windowEvents, stopwatchEvents, aggregationThreshold } = e.data;
-  const processedData = processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregationThreshold);
-  self.postMessage(processedData);
+self.onmessage = function (e) {
+    const { afkEvents, windowEvents, stopwatchEvents, aggregationThreshold, showAfkInSummary } = e.data;
+    if (!afkEvents || !windowEvents || !stopwatchEvents) {
+        console.error("Worker received incomplete data.");
+        return;
+    }
+    processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregationThreshold, showAfkInSummary);
 };

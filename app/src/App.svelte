@@ -14,6 +14,7 @@
   let isLoading = true;
   let selectedDate = new Date();
   let aggregationThreshold = 30; // Default threshold in seconds
+  let showAfkInSummary = true;
 
   // Raw data holders for debugging
   let rawAfkEvents = [];
@@ -35,8 +36,8 @@
   $: week = getWeekNumber(selectedDate);
   $: timeViewForDay = processedData?.time_view?.[year]?.[month]?.[week]?.[day] || {};
 
-  // Re-runs the pipeline whenever selectedDate or aggregationThreshold changes
-  $: if (buckets) loadAndProcessEvents(selectedDate, aggregationThreshold);
+  // Re-runs the pipeline whenever selectedDate, aggregationThreshold, or showAfkInSummary changes
+  $: if (buckets) loadAndProcessEvents(selectedDate, aggregationThreshold, showAfkInSummary);
 
   /**
    * Finds a bucket ID from the buckets object based on the client name.
@@ -82,8 +83,9 @@
    * Main data fetching and processing pipeline for a specific date.
    * @param {Date} date The date to fetch and process data for.
    * @param {number} threshold The aggregation threshold in seconds.
+   * @param {boolean} includeAfk Whether to include AFK data in summaries.
    */
-  async function loadAndProcessEvents(date, threshold) {
+  async function loadAndProcessEvents(date, threshold, includeAfk) {
     console.log(`Starting data processing pipeline for ${date.toISOString().slice(0, 10)} with threshold ${threshold}s...`);
     isLoading = true;
     processedData = {}; // Clear previous data
@@ -116,7 +118,8 @@
         afkEvents,
         windowEvents,
         stopwatchEvents,
-        aggregationThreshold: threshold
+        aggregationThreshold: threshold,
+        showAfkInSummary: includeAfk
       });
 
     } catch (error) {
@@ -194,6 +197,10 @@ cors_origins = "http://localhost:8000,{origin}"
         <label for="threshold">Порог агрегации (сек):</label>
         <input type="number" id="threshold" min="0" bind:value={aggregationThreshold} />
       </div>
+      <label class="checkbox-label">
+        <input type="checkbox" bind:checked={showAfkInSummary} />
+        Учитывать AFK в сводках
+      </label>
       <button on:click={handleDebugDownload}>Скачать данные для отладки</button>
     </div>
     

@@ -17,11 +17,12 @@ The application is a single-page application (SPA) that runs entirely in the bro
 *   `app/src/App.svelte`: The main Svelte component that serves as the entry point. It orchestrates the data fetching pipeline, manages application state (like the selected date), and passes the final, processed data down to the view components.
 *   `app/src/lib/apiClient.js`: A module responsible for all communication with the ActivityWatch REST API. It handles fetching events from the server.
 *   `app/src/lib/dataProcessor.js`: The core of the application's logic. This module is responsible for fetching raw data from ActivityWatch, filtering it by activity, cleaning inconsistencies, and transforming it into two separate data models for the UI: a clean "aggregated" view (with short events grouped into meta-events) and a raw "detailed" view.
-*   `app/src/lib/dataProcessor.worker.js`: A parallel implementation of `dataProcessor.js` designed to run in a background Web Worker, ensuring the UI remains responsive during heavy data processing.
+*   `app/src/lib/dataProcessor.worker.js`: Contains the core data processing logic that runs in a background Web Worker. It handles filtering raw data, cleaning inconsistencies (like AFK overlaps), aggregating consecutive short events into "meta-events" to reduce visual noise, and calculates hourly summaries, including optional AFK time.
 *   `app/src/lib/DatePicker.svelte`: A UI component that allows the user to select a date for analysis.
-*   `app/src/lib/TimelineView.svelte`: The main view component that orchestrates the hourly layout. It receives data for a whole day, iterates over each hour, and arranges multiple `HourBlock` timeline tracks into a compact view. It also contains the logic for the collapsible details list for each hour.
+*   `app/src/lib/TimelineView.svelte`: The container for the "Detailed Day View". It organizes data into hourly blocks, visualizes events on multiple parallel tracks, and integrates stacked bar charts for hourly summaries.
 *   `app/src/lib/HourBlock.svelte`: A component that displays a collapsible list of all events within a single hour.
 *   `app/src/lib/HourSummary.svelte`: A UI component that renders the hour summary, showing a breakdown of time spent per application and task.
+*   `app/src/lib/StackedBarChart.svelte`: A minimalist component for rendering a stacked bar chart, used for visualizing hourly time distribution.
 *   `app/src/lib/EventBar.svelte`: A component responsible for the visual representation of a single event on a timeline track.
 *   `app/src/lib/timeUtils.js`: A utility module for shared time-related functions, like formatting durations.
 *   `app/src/main.js`: The entry point for the frontend application, responsible for initializing the Svelte app.
