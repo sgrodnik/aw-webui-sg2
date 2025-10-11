@@ -98,7 +98,7 @@
   class:aggregated={event.data.is_aggregated}
   style={getEventPosition(event)}
   style:--highlight-opacity={$highlightedIdentifier === event.sdbmId ? 1 : 0.8}
-  style:--highlight-border-color={$highlightedIdentifier === event.sdbmId ? 'rgba(0,0,0,0.5)' : 'transparent'}
+  style:--highlight-border-color={$highlightedIdentifier === event.sdbmId ? 'rgba(0,0,0,0.3)' : 'rgba(220,220,220,0.5)'}
   title={formatTitle(event)}
   on:mouseover={handleMouseover}
   on:mouseout={handleMouseout}
@@ -108,7 +108,7 @@
   .event-bar {
     position: absolute;
     height: 100%;
-    background-color: #4db6ac; /* A pleasant color from the user's themes (mint) */
+    background-color: #f4f4f4;
     border-radius: 3px;
     opacity: var(--highlight-opacity, 0.8);
     cursor: pointer;

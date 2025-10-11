@@ -18,7 +18,6 @@
     position: relative;
     width: 100%;
     height: 20px; 
-    background-color: #f0f0f0;
     border-radius: 4px;
     border: 1px solid #e0e0e0;
     flex-grow: 1; /* Allow track to fill space */
