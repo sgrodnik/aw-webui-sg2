@@ -187,14 +187,10 @@ function aggregateShortEvents(events, durationThreshold) {
                 totalCleanDuration += event.duration;
             }
 
-            const sortedApps = Object.entries(appStats).sort((a, b) => b[1] - a[1]);
-            const titleDetails = sortedApps.map(([app, dur]) => `${app} (${Math.round(dur)}s)`).join(', ');
-            const originalIds = currentGroup.map(e => e.id).join(', ');
-            const title = `Мелкая активность (IDs: ${originalIds}) (${Math.round(totalCleanDuration)}s): ${titleDetails}`;
-
+            const title = 'Aggregated Activity';
             const newId = `meta_${groupStart.toISOString()}_${currentGroup.length}`;
-            
-            const metaEvent = {
+
+            aggregatedEvents.push({
                 id: newId,
                 timestamp: groupStart.toISOString(),
                 duration: totalDuration,
@@ -203,16 +199,11 @@ function aggregateShortEvents(events, durationThreshold) {
                     is_aggregated: true,
                     title: title,
                     apps: appStats,
+                    cleanDuration: totalCleanDuration,
                     eventCount: currentGroup.length,
-                    original_events: currentGroup 
+                    original_events: currentGroup
                 }
-            };
-
-            if (hasDebugId) {
-                console.log('[DEBUG] Created meta-event:', JSON.parse(JSON.stringify(metaEvent)));
-            }
-
-            aggregatedEvents.push(metaEvent);
+            });
         }
         currentGroup = [];
     }

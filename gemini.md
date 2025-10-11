@@ -21,7 +21,7 @@ The application is a single-page application (SPA) that runs entirely in the bro
 *   `app/src/lib/DatePicker.svelte`: A UI component that allows the user to select a date for analysis.
 *   `app/src/lib/TimelineView.svelte`: The container for the "Detailed Day View". It organizes data into hourly blocks and visualizes events on multiple parallel tracks, including separate tracks for raw "detailed" data and cleaned-up "aggregated" data.
 *   `app/src/lib/HourBlock.svelte`: A component that displays a collapsible list of all events within a single hour.
-*   `app/src/lib/EventBar.svelte`: A component responsible for the visual representation of a single event on a timeline track.
+*   `app/src/lib/EventBar.svelte`: A component responsible for the visual representation of a single event. It also contains complex logic for generating detailed, multi-level tooltips, especially for aggregated "meta-events".
 *   `app/src/main.js`: The entry point for the frontend application, responsible for initializing the Svelte app.
 *   `app/package.json`: Lists the project's dependencies and defines scripts for building, developing, and testing.
 *   `input/*.json`: Sample data from the ActivityWatch API. These files can be used to understand the structure of the data returned by the API.
