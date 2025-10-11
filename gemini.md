@@ -25,7 +25,8 @@ UI-specific state that needs to be shared across components, such as the identif
 *   `app/src/lib/HourBlock.svelte`: A component that displays a collapsible list of all events within a single hour.
 *   `app/src/lib/HourSummary.svelte`: A UI component that renders the hour summary, showing a breakdown of time spent per application and task.
 *   `app/src/lib/StackedBarChart.svelte`: A minimalist component for rendering a stacked bar chart, used for visualizing hourly time distribution.
-*   `app/src/lib/EventBar.svelte`: A component responsible for the visual representation of a single event on a timeline track. It also contains the logic for the hover-highlighting feature, reacting to changes in `highlightStore.js` and applying styles via CSS custom properties.
+*   `app/src/lib/EventBar.svelte`: A component responsible for the visual representation of a single event on a timeline track, including a text label with the event's title or alias. It also contains the logic for the hover-highlighting feature, reacting to changes in `highlightStore.js` and applying styles via CSS custom properties.
+*   `app/src/lib/appAliases.js`: A module that exports a mapping of application executable names to short aliases for more compact display in the UI.
 *   `app/src/lib/highlightStore.js`: A Svelte store that holds the identifier of the currently hovered event, enabling the cross-component highlighting feature.
 *   `app/src/lib/timeUtils.js`: A utility module for shared time-related functions, like formatting durations.
 *   `app/src/main.js`: The entry point for the frontend application, responsible for initializing the Svelte app.

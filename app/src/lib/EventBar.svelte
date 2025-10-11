@@ -1,8 +1,8 @@
 <script>
-    import { createEventDispatcher } from 'svelte';
-    import { formatDuration } from './timeUtils.js';
-    import { highlightedIdentifier } from './highlightStore.js';
-
+      import { createEventDispatcher } from 'svelte';
+      import { formatDuration } from './timeUtils.js';
+      import { highlightedIdentifier } from './highlightStore.js';
+      import { appAliases } from './appAliases.js';
     export let event;
     export let track = 'detailed'; // detailed, aggregated, tasks
 
@@ -91,6 +91,24 @@
     const width = (event.duration / 3600) * 100;
     return `left: ${left}%; width: ${width}%;`;
   }
+
+  function getEventLabel(event) {
+    if (event.data.is_aggregated) {
+      return `${event.data.eventCount} events`;
+    }
+    if (event.data.label) { // Task Event
+      return event.data.label;
+    }
+    if (event.data.title) {
+        const appName = event.data.app;
+        const alias = appAliases[appName];
+        if (alias) {
+            return `${alias}`;
+        }
+        return event.data.title;
+    }
+    return '';
+  }
 </script>
 
 <div
@@ -102,7 +120,9 @@
   title={formatTitle(event)}
   on:mouseover={handleMouseover}
   on:mouseout={handleMouseout}
-></div>
+>
+  <span class="event-label">{getEventLabel(event)}</span>
+</div>
 
 <style>
   .event-bar {
@@ -114,6 +134,15 @@
     cursor: pointer;
     box-sizing: border-box;
     border: 1px solid var(--highlight-border-color, transparent);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .event-label {
+    display: block;
+    padding: 0 0.5em;
+    font-size: 12px;
+    line-height: 20px; /* Match parent height */
+    color: #333;
   }
   .event-bar:hover {
     opacity: 1;
