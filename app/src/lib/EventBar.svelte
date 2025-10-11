@@ -39,16 +39,34 @@
         }
 
         details += '\nСодержимое (заголовки):\n';
-        event.data.original_events
-          .slice()
-          .sort((a, b) => b.duration - a.duration)
-          .forEach(orig => {
-              const percentage = cleanDuration > 0 ? ((orig.duration / cleanDuration) * 100).toFixed(0) : 0;
-              if (percentage > 0) {
-                  const title = (orig.data.title || '[no title]').substring(0, 70);
-                  details += `• ${percentage}% ${orig.data.app}: ${title} (${formatDuration(orig.duration)})\n`;
-              }
-          });
+
+        const groupedByTitle = new Map();
+        event.data.original_events.forEach(orig => {
+            const key = `${orig.data.app}::${orig.data.title}`;
+            if (!groupedByTitle.has(key)) {
+                groupedByTitle.set(key, {
+                    duration: 0,
+                    count: 0,
+                    app: orig.data.app,
+                    title: orig.data.title
+                });
+            }
+            const group = groupedByTitle.get(key);
+            group.duration += orig.duration;
+            group.count += 1;
+        });
+
+        const sortedGroups = Array.from(groupedByTitle.values())
+            .sort((a, b) => b.duration - a.duration);
+
+        sortedGroups.forEach(group => {
+            const percentage = cleanDuration > 0 ? ((group.duration / cleanDuration) * 100).toFixed(0) : 0;
+            if (percentage > 0) {
+                const title = (group.title || '[no title]').substring(0, 70);
+                const countStr = group.count > 1 ? ` (${group.count} событий)` : '';
+                details += `• ${percentage}% (${formatDuration(group.duration)}): ${group.app} - ${title}${countStr}\n`;
+            }
+        });
 
         return summary + details;
 
