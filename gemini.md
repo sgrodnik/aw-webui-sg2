@@ -20,8 +20,10 @@ The application is a single-page application (SPA) that runs entirely in the bro
 *   `app/src/lib/dataProcessor.worker.js`: A parallel implementation of `dataProcessor.js` designed to run in a background Web Worker, ensuring the UI remains responsive during heavy data processing.
 *   `app/src/lib/DatePicker.svelte`: A UI component that allows the user to select a date for analysis.
 *   `app/src/lib/TimelineView.svelte`: The main view component that orchestrates the hourly layout. It receives data for a whole day, iterates over each hour, and arranges multiple `HourBlock` timeline tracks into a compact view. It also contains the logic for the collapsible details list for each hour.
-*   `app/src/lib/HourBlock.svelte`: A simple, reusable component that renders a single graphical timeline track for a given set of events.
-*   `app/src/lib/EventBar.svelte`: A component responsible for the visual representation of a single event. It also contains complex logic for generating detailed, multi-level tooltips, especially for aggregated "meta-events".
+*   `app/src/lib/HourBlock.svelte`: A component that displays a collapsible list of all events within a single hour.
+*   `app/src/lib/HourSummary.svelte`: A UI component that renders the hour summary, showing a breakdown of time spent per application and task.
+*   `app/src/lib/EventBar.svelte`: A component responsible for the visual representation of a single event on a timeline track.
+*   `app/src/lib/timeUtils.js`: A utility module for shared time-related functions, like formatting durations.
 *   `app/src/main.js`: The entry point for the frontend application, responsible for initializing the Svelte app.
 *   `app/package.json`: Lists the project's dependencies and defines scripts for building, developing, and testing.
 *   `input/*.json`: Sample data from the ActivityWatch API. These files can be used to understand the structure of the data returned by the API.
