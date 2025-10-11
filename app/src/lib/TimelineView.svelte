@@ -3,6 +3,7 @@
   import EventBar from './EventBar.svelte';
 
   export let data;
+  export let threshold;
 
   let timeViewForDay = null;
 
@@ -36,9 +37,36 @@
     return events.filter(e => e.data.label);
   }
 
-  function getWindowEvents(events) {
+  // For "Приложения (агрегировано)" track: shows the "clean" view from the processor.
+  function getAggregatedWindowEvents(events) {
+    if (threshold === 0) {
+      return []; // This track is empty if aggregation is off
+    }
+    // The processor already creates the "clean" list with long events, single short events, and meta-events.
+    // We just need to filter out non-window events.
     return events.filter(e => e.data.app);
   }
+
+  // For "Приложения (детально)" track: reconstructs the original raw event list.
+  function getRawWindowEvents(events) {
+    // If aggregation is off, this is the main track showing all events.
+    if (threshold === 0) {
+      return events.filter(e => e.data.app && !e.data.is_aggregated);
+    }
+
+    const aggregatedList = getAggregatedWindowEvents(events);
+
+    // Get all events that are not meta-events (long and single short ones)
+    const nonMetaEvents = aggregatedList.filter(e => !e.data.is_aggregated);
+
+    // Get all the original events from inside the meta-events
+    const fromGroups = aggregatedList
+      .filter(e => e.data.is_aggregated)
+      .flatMap(e => e.data.original_events || []);
+    
+    return [...nonMetaEvents, ...fromGroups];
+  }
+
 </script>
 
 <div class="timeline-container">
@@ -58,13 +86,24 @@
             </div>
         </div>
 
-        <div class="track-container">
-            <p class="track-label">Приложения</p>
-            <div class="timeline">
-                {#each getWindowEvents(events) as event (event.id + event.timestamp)}
-                    <EventBar {event} />
-                {/each}
-            </div>
+        <div class="track-container-group">
+          <div class="track-container">
+              <p class="track-label">Приложения (агрегировано)</p>
+              <div class="timeline">
+                  {#each getAggregatedWindowEvents(events) as event (event.id + event.timestamp)}
+                      <EventBar {event} />
+                  {/each}
+              </div>
+          </div>
+
+          <div class="track-container detail-track">
+              <p class="track-label">Приложения (детально)</p>
+              <div class="timeline">
+                  {#each getRawWindowEvents(events) as event (event.id + event.timestamp)}
+                      <EventBar {event} />
+                  {/each}
+              </div>
+          </div>
         </div>
 
         <HourBlock allEvents={events} />
@@ -104,8 +143,23 @@
     margin-bottom: 10px;
   }
 
+  .track-container-group {
+    background-color: #f9f9f9;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+
+  .track-container-group .track-container:last-child {
+    margin-bottom: 0;
+  }
+
+  .detail-track .timeline {
+    background-color: #e9e9e9; /* Slightly different background for detail track */
+  }
+
   .track-label {
-    width: 80px; /* Fixed width for labels */
+    width: 150px; /* Increased width for longer labels */
     flex-shrink: 0;
     font-size: 0.9em;
     color: #6c757d;

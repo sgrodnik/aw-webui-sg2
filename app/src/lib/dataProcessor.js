@@ -6,7 +6,7 @@
  * @param {Array} stopwatchEvents Events from the Stopwatch watcher.
  * @returns {Promise<{time_view: object, task_view: object}>} A promise that resolves with the processed data.
  */
-export function processActivityData(afkEvents, windowEvents, stopwatchEvents) {
+export function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregationThreshold) {
   return new Promise((resolve, reject) => {
     // Vite requires `new URL(...)` for worker imports.
     const worker = new Worker(new URL('./dataProcessor.worker.js', import.meta.url), {
@@ -28,6 +28,6 @@ export function processActivityData(afkEvents, windowEvents, stopwatchEvents) {
     console.log("Sending data to worker for processing...");
     // We need to transfer the data, not just copy it, for performance.
     // However, these are complex objects, so we'll stick to copying for now.
-    worker.postMessage({ afkEvents, windowEvents, stopwatchEvents });
+    worker.postMessage({ afkEvents, windowEvents, stopwatchEvents, aggregationThreshold });
   });
 }

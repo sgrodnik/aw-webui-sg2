@@ -1,3 +1,5 @@
+const DEBUG_IDS = new Set([33045, 33046, 33047, 33048, 33049, 33051, 33052, 33053]);
+
 /**
  * Helper to get the ISO week number for a given Date.
  * @param {Date} d The date.
@@ -144,6 +146,115 @@ function analyzeTaskOverlaps(taskEvents) {
 
 
 /**
+ * Aggregates consecutive short events into a single meta-event to reduce visual noise.
+ * @param {Array<object>} events - Sorted array of events to process.
+ * @param {number} durationThreshold - The duration in seconds below which an event is considered "short".
+ * @returns {Array<object>} A new array with short events aggregated.
+ */
+function aggregateShortEvents(events, durationThreshold) {
+    if (events.length === 0) {
+        return [];
+    }
+
+    const aggregatedEvents = [];
+    let currentGroup = [];
+    const MAX_GAP_SECONDS = 10; // User-defined value
+
+    function finalizeGroup() {
+        if (currentGroup.length === 0) {
+            return;
+        }
+
+        const hasDebugId = currentGroup.some(e => DEBUG_IDS.has(e.id));
+        if (hasDebugId) {
+            console.log(`[DEBUG] Finalizing group with IDs: ${currentGroup.map(e => e.id).join(', ')}`);
+        }
+
+        if (currentGroup.length >= 1) {
+            const firstEvent = currentGroup[0];
+            const lastEvent = currentGroup[currentGroup.length - 1];
+
+            const groupStart = new Date(firstEvent.timestamp);
+            const groupEnd = new Date(new Date(lastEvent.timestamp).getTime() + lastEvent.duration * 1000);
+            
+            const totalDuration = (groupEnd.getTime() - groupStart.getTime()) / 1000;
+
+            const appStats = {};
+            let totalCleanDuration = 0;
+            for (const event of currentGroup) {
+                const appName = event.data.app;
+                appStats[appName] = (appStats[appName] || 0) + event.duration;
+                totalCleanDuration += event.duration;
+            }
+
+            const sortedApps = Object.entries(appStats).sort((a, b) => b[1] - a[1]);
+            const titleDetails = sortedApps.map(([app, dur]) => `${app} (${Math.round(dur)}s)`).join(', ');
+            const originalIds = currentGroup.map(e => e.id).join(', ');
+            const title = `Мелкая активность (IDs: ${originalIds}) (${Math.round(totalCleanDuration)}s): ${titleDetails}`;
+
+            const newId = `meta_${groupStart.toISOString()}_${currentGroup.length}`;
+            
+            const metaEvent = {
+                id: newId,
+                timestamp: groupStart.toISOString(),
+                duration: totalDuration,
+                data: {
+                    app: 'Aggregated',
+                    is_aggregated: true,
+                    title: title,
+                    apps: appStats,
+                    eventCount: currentGroup.length,
+                    original_events: currentGroup 
+                }
+            };
+
+            if (hasDebugId) {
+                console.log('[DEBUG] Created meta-event:', JSON.parse(JSON.stringify(metaEvent)));
+            }
+
+            aggregatedEvents.push(metaEvent);
+        }
+        currentGroup = [];
+    }
+
+    for (const event of events) {
+        if (DEBUG_IDS.has(event.id)) {
+            console.log(`[DEBUG] Processing event ${event.id}, duration: ${event.duration}s`);
+        }
+
+        if (event.duration < durationThreshold) {
+            if (currentGroup.length > 0) {
+                const lastEvent = currentGroup[currentGroup.length - 1];
+                const lastEventEnd = new Date(lastEvent.timestamp).getTime() + lastEvent.duration * 1000;
+                const currentEventStart = new Date(event.timestamp).getTime();
+                const gap = (currentEventStart - lastEventEnd) / 1000;
+
+                if (gap > MAX_GAP_SECONDS) {
+                    if (currentGroup.some(e => DEBUG_IDS.has(e.id))) {
+                        console.log(`[DEBUG] Gap of ${gap.toFixed(2)}s is too large. Finalizing group.`);
+                    }
+                    finalizeGroup();
+                }
+            }
+            currentGroup.push(event);
+            if (DEBUG_IDS.has(event.id)) {
+                console.log(`[DEBUG] Pushed ${event.id} to currentGroup. Group now: [${currentGroup.map(e => e.id).join(', ')}]`);
+            }
+        } else {
+            if (currentGroup.length > 0 && currentGroup.some(e => DEBUG_IDS.has(e.id))) {
+                console.log(`[DEBUG] Encountered long event. Finalizing group.`);
+            }
+            finalizeGroup();
+            aggregatedEvents.push(event);
+        }
+    }
+
+    finalizeGroup();
+
+    return aggregatedEvents;
+}
+
+/**
  * Helper to set a value in a nested object path, creating objects if they don't exist.
  * The final property is always an array to which the value is pushed.
  * @param {object} obj The object to modify.
@@ -214,11 +325,33 @@ function splitEventByHour(event) {
         const duration = (splitPoint.getTime() - current.getTime()) / 1000;
 
         if (duration > 0) {
-            fragments.push({
+            const fragment = {
                 ...event,
+                id: `${event.id}_${current.toISOString()}`, // Create unique ID for each fragment
                 timestamp: current.toISOString(),
                 duration: duration,
-            });
+            };
+
+            // If it's a meta-event, we must also filter its original_events to match the fragment's timeframe
+            if (fragment.data.is_aggregated && Array.isArray(fragment.data.original_events)) {
+                const fragmentStart = current;
+                const fragmentEnd = splitPoint;
+
+                const newOriginalEvents = fragment.data.original_events.filter(orig => {
+                    const origStart = new Date(orig.timestamp);
+                    const origEnd = new Date(origStart.getTime() + orig.duration * 1000);
+                    // Check for overlap between the original event and the new fragment
+                    return origStart < fragmentEnd && origEnd > fragmentStart;
+                });
+
+                // Create a new data object to avoid modifying the shared reference
+                fragment.data = {
+                    ...fragment.data,
+                    original_events: newOriginalEvents,
+                    eventCount: newOriginalEvents.length
+                };
+            }
+            fragments.push(fragment);
         }
         current = splitPoint;
     }
@@ -233,7 +366,7 @@ function splitEventByHour(event) {
  * @param {Array} stopwatchEvents Events from the Stopwatch watcher.
  * @returns {{time_view: object, task_view: object}} The processed data structured for visualization.
  */
-function processActivityData(afkEvents, windowEvents, stopwatchEvents) {
+function processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregationThreshold) {
     // 1. Generate and clean "not-afk" intervals
     const rawNotAfkIntervals = afkEvents
         .filter(e => e.data.status === 'not-afk')
@@ -247,8 +380,19 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents) {
     console.log(`Cleaned up not-afk intervals. Before: ${rawNotAfkIntervals.length}, After: ${notAfkIntervals.length}`);
 
     // 2. Filter and split events by the cleaned "not-afk" intervals
-    const activeWindowEvents = windowEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
+    let activeWindowEvents = windowEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
     const activeStopwatchEvents = stopwatchEvents.flatMap(event => getActiveFragments(event, notAfkIntervals));
+
+    // --- New Step: Aggregate short window events to reduce noise ---
+    if (aggregationThreshold > 0) {
+        // Ensure events are sorted by time before aggregation
+        activeWindowEvents.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        const preAggregationCount = activeWindowEvents.length;
+        activeWindowEvents = aggregateShortEvents(activeWindowEvents, aggregationThreshold);
+        console.log(`Aggregated short window events with threshold ${aggregationThreshold}s. Before: ${preAggregationCount}, After: ${activeWindowEvents.length}`);
+    } else {
+        console.log('Aggregation skipped as threshold is 0.');
+    }
 
     // --- Run analysis on window and task events ---
     analyzeWindowOverlaps(activeWindowEvents);
@@ -307,9 +451,10 @@ function processActivityData(afkEvents, windowEvents, stopwatchEvents) {
 }
 
 self.onmessage = function(e) {
-  const { afkEvents, windowEvents, stopwatchEvents } = e.data;
+  const { afkEvents, windowEvents, stopwatchEvents, aggregationThreshold } = e.data;
   console.log("Worker received data, starting processing...");
-  const processedData = processActivityData(afkEvents, windowEvents, stopwatchEvents);
+  const processedData = processActivityData(afkEvents, windowEvents, stopwatchEvents, aggregationThreshold);
   console.log("Final object from worker:", processedData);
+  console.log('[DEBUG] Final data to UI:', JSON.stringify(processedData, null, 2));
   self.postMessage(processedData);
 };

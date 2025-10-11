@@ -3,6 +3,10 @@
   export let event;
 
   function getEventTitle(event) {
+    // For aggregated meta-events, the title is pre-generated.
+    if (event.data.is_aggregated) {
+      return event.data.title;
+    }
     if (event.data.label) {
       return `[ЗАДАЧА] ${event.data.label}`;
     }
@@ -31,8 +35,9 @@
 
 <div
   class="event-bar"
+  class:aggregated={event.data.is_aggregated}
   style={getEventPosition(event)}
-  title={`${getEventTitle(event)} (${formatDuration(event.duration)})`}
+  title={`[ID: ${event.id}] ${getEventTitle(event)} (${formatDuration(event.duration)})`}
 ></div>
 
 <style>
@@ -49,5 +54,10 @@
   .event-bar:hover {
     opacity: 1;
     border: 1px solid rgba(0,0,0,0.5);
+  }
+
+  /* Style for aggregated meta-events */
+  .event-bar.aggregated {
+    background-color: #bdbdbd; /* Neutral grey color */
   }
 </style>

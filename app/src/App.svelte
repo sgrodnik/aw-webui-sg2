@@ -11,9 +11,14 @@
   let processedData = null;
   let isLoading = true;
   let selectedDate = new Date();
+  let aggregationThreshold = 30; // Default threshold in seconds
 
-  // Reactive statement that re-runs the pipeline whenever selectedDate changes
-  $: if (buckets) loadAndProcessEvents(selectedDate);
+  // Raw data holders for debugging
+  let rawAfkEvents = [];
+  let rawWindowEvents = [];
+
+  // Reactive statement that re-runs the pipeline whenever selectedDate or aggregationThreshold changes
+  $: if (buckets) loadAndProcessEvents(selectedDate, aggregationThreshold);
 
   /**
    * Finds a bucket ID from the buckets object based on the client name.
@@ -28,13 +33,44 @@
   }
 
   /**
+   * Triggers a browser download for the given data as a JSON file.
+   * @param {object} data The data to download.
+   * @param {string} filename The name of the file.
+   */
+  function downloadJSON(data, filename) {
+    if (!data || data.length === 0) {
+      alert(`Нет данных для скачивания в ${filename}`);
+      return;
+    }
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function handleDebugDownload() {
+    downloadJSON(rawWindowEvents, 'window-events.json');
+    downloadJSON(rawAfkEvents, 'afk-events.json');
+    downloadJSON(processedData, 'processed-data.json');
+  }
+
+  /**
    * Main data fetching and processing pipeline for a specific date.
    * @param {Date} date The date to fetch and process data for.
+   * @param {number} threshold The aggregation threshold in seconds.
    */
-  async function loadAndProcessEvents(date) {
-    console.log(`Starting data processing pipeline for ${date.toISOString().slice(0, 10)}...`);
+  async function loadAndProcessEvents(date, threshold) {
+    console.log(`Starting data processing pipeline for ${date.toISOString().slice(0, 10)} with threshold ${threshold}s...`);
     isLoading = true;
     processedData = null; // Clear previous data
+    rawAfkEvents = [];
+    rawWindowEvents = [];
 
     // Dynamically find bucket IDs from the fetched list
     const BUCKET_AFK_ID = findBucketId(buckets, 'aw-watcher-afk');
@@ -68,8 +104,12 @@
         getEvents(BUCKET_STOPWATCH_ID, startTime, endTime)
       ]);
 
+      // Store raw data for debugging purposes
+      rawAfkEvents = afkEvents;
+      rawWindowEvents = windowEvents;
+
       // Pass the raw data to the processor and store it in the state.
-      processedData = await processActivityData(afkEvents, windowEvents, stopwatchEvents);
+      processedData = await processActivityData(afkEvents, windowEvents, stopwatchEvents, threshold);
 
       console.log("--- PIPELINE FINISHED ---");
       console.log("Final processed data:", processedData);
@@ -139,12 +179,19 @@ cors_origins = "http://localhost:8000,{origin}"
       </p>
     </div>
   {:else}
-    <DatePicker bind:selectedDate={selectedDate} />
+    <div class="controls-container">
+      <DatePicker bind:selectedDate={selectedDate} />
+      <div class="threshold-control">
+        <label for="threshold">Порог агрегации (сек):</label>
+        <input type="number" id="threshold" min="0" bind:value={aggregationThreshold} />
+      </div>
+      <button on:click={handleDebugDownload}>Скачать данные для отладки</button>
+    </div>
     
     {#if isLoading}
       <p>Загрузка и обработка данных...</p>
     {:else if processedData && processedData.time_view && Object.keys(processedData.time_view).length > 0}
-      <TimelineView data={processedData} />
+      <TimelineView data={processedData} threshold={aggregationThreshold} />
     {:else}
       <p>Нет данных для отображения за {selectedDate.toLocaleDateString()}.</p>
     {/if}
@@ -155,6 +202,30 @@ cors_origins = "http://localhost:8000,{origin}"
   main {
     text-align: left;
     padding: 0;
+  }
+
+  .controls-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+  }
+
+  .threshold-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .threshold-control label {
+    font-size: 0.9em;
+  }
+
+  .threshold-control input {
+    width: 60px;
   }
 
   .error-heading {
